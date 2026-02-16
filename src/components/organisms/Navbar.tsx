@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Calendar, Users, Home, Upload, FileText, UserCheck, CalendarClock } from 'lucide-react';
+import { Menu, X, Calendar, Users, Home, Upload, FileText, UserCheck, CalendarClock, Settings, UserCog } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +15,8 @@ const navItems = [
   { href: '/kaprodi/alokasi', label: 'Alokasi Penguji', icon: UserCheck },
   { href: '/admin/jadwal-seminar', label: 'Jadwalkan Seminar', icon: CalendarClock },
   { href: '/admin/jadwal/unggah', label: 'Unggah Jadwal', icon: Upload },
+  { href: '/admin/staff', label: 'Pegawai', icon: Users },
+  { href: '/admin/roles', label: 'Jabatan', icon: UserCog },
   { href: '/kalender', label: 'Kalender', icon: Calendar },
 ];
 

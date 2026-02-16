@@ -8,21 +8,35 @@ export default defineSchema({
     nip: v.string(), // NIP is the Indonesian employee identification number
     expertise: v.array(v.string()), // Array of expertise areas
     status: v.optional(v.string()), // e.g., "active", "on leave", "inactive"
+    role: v.optional(v.union(
+      v.literal('dosen'),      // Regular lecturer
+      v.literal('kaprodi'),    // Head of Department
+      v.literal('sekprodi')    // Secretary of Department
+    )),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
-  }).index('by_nip', ['nip']),
+  })
+    .index('by_nip', ['nip'])
+    .index('by_role', ['role']),
 
   // Staff table - stores administrative staff information
   staff: defineTable({
     name: v.string(),
-    nip: v.string(),
+    idPegawai: v.string(), // Employee ID
+    nip: v.optional(v.string()), // NIP (optional for non-civil servant)
     role: v.union(
-      v.literal('Admin'),
-      v.literal('Kaprodi') // Head of Department
+      v.literal('admin_akademik'),  // Academic Admin
+      v.literal('sekprodi'),        // Secretary of Department
+      v.literal('kaprodi'),         // Head of Department
+      v.literal('admin')            // General Admin
     ),
+    status: v.optional(v.string()), // e.g., "active", "inactive"
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
-  }).index('by_nip', ['nip']),
+  })
+    .index('by_nip', ['nip'])
+    .index('by_idPegawai', ['idPegawai'])
+    .index('by_role', ['role']),
 
   // Teaching schedules table - stores teaching schedule entries
   teaching_schedules: defineTable({
