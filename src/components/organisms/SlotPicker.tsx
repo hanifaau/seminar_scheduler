@@ -1,9 +1,17 @@
 'use client';
 
 import * as React from 'react';
-import { Calendar, Clock, CheckCircle2, AlertTriangle, ChevronRight, Loader2 } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, AlertTriangle, ChevronRight, Loader2, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/atoms/Button';
+import { Badge } from '@/components/atoms/Badge';
+
+interface NextLecturerClass {
+  lecturerName: string;
+  className: string;
+  classStart: string;
+  minutesUntilClass: number;
+}
 
 interface TimeSlot {
   day: string;
@@ -12,6 +20,7 @@ interface TimeSlot {
   endTime: string;
   type: 'ideal' | 'alternative';
   availableDuration: number;
+  nextLecturerClass?: NextLecturerClass;
 }
 
 interface SlotPickerProps {
@@ -22,6 +31,7 @@ interface SlotPickerProps {
   onCheckNextWeek?: () => void;
   isLoading?: boolean;
   requiredDuration: number;
+  alternativeDuration?: number;
 }
 
 // Format date to Indonesian locale
@@ -51,6 +61,7 @@ export function SlotPicker({
   onCheckNextWeek,
   isLoading = false,
   requiredDuration,
+  alternativeDuration,
 }: SlotPickerProps) {
   const hasIdealSlots = idealSlots.length > 0;
   const hasAlternativeSlots = alternativeSlots.length > 0;
@@ -125,13 +136,13 @@ export function SlotPicker({
             </span>
           </div>
 
-          <div className="grid gap-3">
+          <div className="space-y-4">
             {Object.entries(groupedIdealSlots).map(([date, slots]) => (
               <div key={date} className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   {formatDate(date)}
                 </p>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
                   {slots.map((slot, index) => (
                     <button
                       key={`${slot.date}-${slot.startTime}-${index}`}
@@ -144,18 +155,36 @@ export function SlotPicker({
                           : 'border-emerald-200 dark:border-emerald-900/50 bg-card'
                       )}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-foreground">
+                      {/* Time Header */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-foreground text-lg">
                           {slot.startTime} - {slot.endTime}
                         </span>
                         {selectedSlot?.date === slot.date && selectedSlot?.startTime === slot.startTime && (
                           <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+
+                      {/* Duration Badge */}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                         <Clock className="h-3 w-3" />
-                        <span>{slot.availableDuration} menit tersedia</span>
+                        <span>Tersedia {slot.availableDuration} menit</span>
                       </div>
+
+                      {/* Next Class Info */}
+                      {slot.nextLecturerClass && (
+                        <div className="mt-2 pt-2 border-t border-emerald-100 dark:border-emerald-900">
+                          <div className="flex items-start gap-2 text-xs">
+                            <User className="h-3 w-3 text-emerald-600 mt-0.5 flex-shrink-0" />
+                            <div className="text-emerald-700 dark:text-emerald-300">
+                              <span className="font-medium">{slot.nextLecturerClass.lecturerName}</span>
+                              <span className="text-emerald-600 dark:text-emerald-400"> mengajar </span>
+                              <span className="font-medium">{slot.nextLecturerClass.className}</span>
+                              <span className="text-emerald-600 dark:text-emerald-400"> jam {slot.nextLecturerClass.classStart}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -174,7 +203,7 @@ export function SlotPicker({
               Slot Alternatif ({alternativeSlots.length})
             </span>
             <span className="text-xs text-muted-foreground">
-              - Durasi {requiredDuration - 10} menit
+              - Durasi {alternativeDuration || requiredDuration - 10} menit
             </span>
           </div>
 
@@ -183,18 +212,18 @@ export function SlotPicker({
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-amber-800 dark:text-amber-200">
-                Slot alternatif memiliki durasi lebih singkat ({requiredDuration - 10} menit). Pastikan waktu cukup untuk seminar.
+                Slot alternatif memiliki durasi lebih singkat ({alternativeDuration || requiredDuration - 10} menit). Pastikan waktu cukup untuk seminar.
               </p>
             </div>
           </div>
 
-          <div className="grid gap-3">
+          <div className="space-y-4">
             {Object.entries(groupedAlternativeSlots).map(([date, slots]) => (
               <div key={date} className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   {formatDate(date)}
                 </p>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
                   {slots.map((slot, index) => (
                     <button
                       key={`${slot.date}-${slot.startTime}-${index}`}
@@ -207,24 +236,52 @@ export function SlotPicker({
                           : 'border-amber-200 dark:border-amber-900/50 bg-card'
                       )}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-foreground">
+                      {/* Time Header */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-foreground text-lg">
                           {slot.startTime} - {slot.endTime}
                         </span>
                         {selectedSlot?.date === slot.date && selectedSlot?.startTime === slot.startTime && (
                           <CheckCircle2 className="h-5 w-5 text-amber-500" />
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+
+                      {/* Duration Badge */}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                         <Clock className="h-3 w-3" />
-                        <span>{slot.availableDuration} menit tersedia</span>
+                        <span>Tersedia {slot.availableDuration} menit</span>
                       </div>
+
+                      {/* Next Class Info */}
+                      {slot.nextLecturerClass && (
+                        <div className="mt-2 pt-2 border-t border-amber-100 dark:border-amber-900">
+                          <div className="flex items-start gap-2 text-xs">
+                            <User className="h-3 w-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <div className="text-amber-700 dark:text-amber-300">
+                              <span className="font-medium">{slot.nextLecturerClass.lecturerName}</span>
+                              <span className="text-amber-600 dark:text-amber-400"> mengajar </span>
+                              <span className="font-medium">{slot.nextLecturerClass.className}</span>
+                              <span className="text-amber-600 dark:text-amber-400"> jam {slot.nextLecturerClass.classStart}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Check Next Week Button */}
+      {onCheckNextWeek && (
+        <div className="flex justify-center pt-4 border-t">
+          <Button variant="outline" onClick={onCheckNextWeek}>
+            <ChevronRight className="h-4 w-4 mr-2" />
+            Cek Minggu Berikutnya
+          </Button>
         </div>
       )}
     </div>
@@ -249,18 +306,18 @@ export function SlotSummary({ slot, seminarType, room, onRoomChange }: SlotSumma
   };
 
   return (
-    <div className="rounded-lg border p-4 space-y-3">
+    <div className="rounded-lg border p-4 space-y-3 bg-card">
       <p className="text-sm font-medium text-foreground">Slot Terpilih:</p>
 
       <div className="grid gap-2">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-foreground">{formatDate(slot.date)}</span>
+          <span className="text-sm text-foreground font-medium">{formatDate(slot.date)}</span>
         </div>
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-foreground">
-            {slot.startTime} - {slot.endTime} WIB
+            <span className="font-medium">{slot.startTime} - {slot.endTime}</span> WIB
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -274,18 +331,30 @@ export function SlotSummary({ slot, seminarType, room, onRoomChange }: SlotSumma
           )}>
             {slot.type === 'ideal' ? 'Slot Ideal' : 'Slot Alternatif'}
           </span>
+          <Badge variant="secondary" className="text-xs">
+            {slot.availableDuration} menit tersedia
+          </Badge>
         </div>
+
+        {/* Next Class Warning */}
+        {slot.nextLecturerClass && (
+          <div className="mt-2 p-2 rounded bg-muted/50 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{slot.nextLecturerClass.lecturerName}</span>
+            <span> akan {slot.nextLecturerClass.className} jam </span>
+            <span className="font-medium text-foreground">{slot.nextLecturerClass.classStart}</span>
+          </div>
+        )}
       </div>
 
       {onRoomChange && (
-        <div className="pt-2 border-t">
+        <div className="pt-3 border-t">
           <label className="text-xs text-muted-foreground">Ruangan (opsional)</label>
           <input
             type="text"
             value={room || ''}
             onChange={(e) => onRoomChange(e.target.value)}
             placeholder="Contoh: Lab Komputer 1"
-            className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </div>
       )}
@@ -293,4 +362,4 @@ export function SlotSummary({ slot, seminarType, room, onRoomChange }: SlotSumma
   );
 }
 
-export type { TimeSlot };
+export type { TimeSlot, NextLecturerClass };

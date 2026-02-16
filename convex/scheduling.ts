@@ -9,17 +9,28 @@ interface TimeSlot {
   endTime: string;
   type: 'ideal' | 'alternative';
   availableDuration: number;
+  // Enhanced info
+  nextLecturerClass?: {
+    lecturerName: string;
+    className: string;
+    classStart: string;
+    minutesUntilClass: number;
+  };
 }
 
 interface LecturerBusySlot {
   startTime: number; // minutes from midnight
   endTime: number; // minutes from midnight
+  lecturerId?: string;
+  lecturerName?: string;
+  activity?: string;
 }
 
 // Working hours configuration
 const WORK_START = 8 * 60; // 08:00 in minutes
 const WORK_END = 17 * 60; // 17:00 in minutes
 const TRANSITION_GAP = 5; // 5 minutes transition buffer
+const MAX_RECOMMENDATIONS = 10; // Maximum slots to return
 
 // Duration requirements by seminar type (in minutes)
 const DURATION_REQUIREMENTS: Record<string, number> = {
@@ -65,7 +76,7 @@ function parseDayName(dayName: string): string {
   return dayMap[dayName] || dayName;
 }
 
-// Get lecturer busy slots for a specific day (including transition gap)
+// Get lecturer busy slots for a specific day (including transition gap and details)
 async function getLecturerBusySlotsForDay(
   ctx: any,
   lecturerId: string,
@@ -76,11 +87,17 @@ async function getLecturerBusySlotsForDay(
     .withIndex('by_lecturer', (q: any) => q.eq('lecturerId', lecturerId))
     .collect();
 
+  const lecturer = await ctx.db.get(lecturerId);
+  const lecturerName = lecturer?.name || 'Dosen';
+
   const daySchedules = schedules.filter((s: any) => parseDayName(s.day) === parseDayName(day));
 
   return daySchedules.map((s: any) => ({
     startTime: timeToMinutes(s.startTime) - TRANSITION_GAP, // Add buffer before
     endTime: timeToMinutes(s.endTime) + TRANSITION_GAP, // Add buffer after
+    lecturerId,
+    lecturerName,
+    activity: s.activity,
   }));
 }
 
@@ -249,6 +266,15 @@ export const getAvailableSlots = query({
       lecturerIds.push(seminarRequest.examiner2Id);
     }
 
+    // Get lecturer names
+    const lecturerNames: Record<string, string> = {};
+    for (const id of lecturerIds) {
+      const lecturer = await ctx.db.get(id);
+      if (lecturer) {
+        lecturerNames[id] = lecturer.name;
+      }
+    }
+
     // Get required duration
     const requiredDuration = DURATION_REQUIREMENTS[seminarRequest.type] || 60;
     const alternativeDuration = requiredDuration - 10; // Secondary search duration
@@ -262,7 +288,7 @@ export const getAvailableSlots = query({
 
     // Check each date
     for (const dateInfo of weekDates) {
-      // Get busy slots for all lecturers on this day
+      // Get busy slots for all lecturers on this day with details
       const allLecturerBusySlots: LecturerBusySlot[][] = [];
 
       for (const lecturerId of lecturerIds) {
@@ -273,7 +299,10 @@ export const getAvailableSlots = query({
       // Get scheduled seminars for this date to avoid double booking
       const scheduledSeminars = await getScheduledSeminarsForDate(ctx, dateInfo.date);
 
-      // For each lecturer, find their free windows including scheduled seminars
+      // Combine all busy slots for finding free windows
+      const allBusySlotsFlat = allLecturerBusySlots.flat();
+
+      // For each lecturer, find their free windows
       const allFreeWindows: Array<Array<{ start: number; end: number }>> = [];
 
       for (let i = 0; i < lecturerIds.length; i++) {
@@ -289,6 +318,18 @@ export const getAvailableSlots = query({
       for (const window of commonFreeWindows) {
         const windowDuration = window.end - window.start;
 
+        // Find the next class after this free window
+        const nextClass = allBusySlotsFlat
+          .filter((slot) => slot.startTime >= window.end - TRANSITION_GAP)
+          .sort((a, b) => a.startTime - b.startTime)[0];
+
+        const nextLecturerClass = nextClass ? {
+          lecturerName: nextClass.lecturerName || 'Dosen',
+          className: nextClass.activity || 'Mengajar',
+          classStart: minutesToTime(nextClass.startTime + TRANSITION_GAP),
+          minutesUntilClass: nextClass.startTime - window.end,
+        } : undefined;
+
         // Check for ideal slot
         if (windowDuration >= requiredDuration) {
           idealSlots.push({
@@ -298,6 +339,7 @@ export const getAvailableSlots = query({
             endTime: minutesToTime(window.start + requiredDuration),
             type: 'ideal',
             availableDuration: windowDuration,
+            nextLecturerClass,
           });
         }
         // Check for alternative slot
@@ -309,10 +351,25 @@ export const getAvailableSlots = query({
             endTime: minutesToTime(window.start + alternativeDuration),
             type: 'alternative',
             availableDuration: windowDuration,
+            nextLecturerClass,
           });
         }
       }
     }
+
+    // Sort slots by date and time, then limit to MAX_RECOMMENDATIONS
+    const sortByDateAndTime = (a: TimeSlot, b: TimeSlot) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.startTime.localeCompare(b.startTime);
+    };
+
+    idealSlots.sort(sortByDateAndTime);
+    alternativeSlots.sort(sortByDateAndTime);
+
+    // Limit to max recommendations
+    const limitedIdealSlots = idealSlots.slice(0, MAX_RECOMMENDATIONS);
+    const remainingSlots = MAX_RECOMMENDATIONS - limitedIdealSlots.length;
+    const limitedAlternativeSlots = alternativeSlots.slice(0, remainingSlots);
 
     // Return combined results with ideal slots first
     return {
@@ -322,15 +379,24 @@ export const getAvailableSlots = query({
         nim: seminarRequest.nim,
         title: seminarRequest.title,
         type: seminarRequest.type,
+        supervisor1Name: lecturerNames[seminarRequest.supervisor1Id],
+        supervisor2Name: seminarRequest.supervisor2Id ? lecturerNames[seminarRequest.supervisor2Id] : undefined,
+        examiner1Name: seminarRequest.examiner1Id ? lecturerNames[seminarRequest.examiner1Id] : undefined,
+        examiner2Name: seminarRequest.examiner2Id ? lecturerNames[seminarRequest.examiner2Id] : undefined,
       },
       requiredDuration,
-      idealSlots,
-      alternativeSlots,
+      alternativeDuration,
+      idealSlots: limitedIdealSlots,
+      alternativeSlots: limitedAlternativeSlots,
       totalIdealSlots: idealSlots.length,
       totalAlternativeSlots: alternativeSlots.length,
+      showingSlots: limitedIdealSlots.length + limitedAlternativeSlots.length,
     };
   },
 });
+
+// Alias for findAvailableSlots (same as getAvailableSlots)
+export const findAvailableSlots = getAvailableSlots;
 
 // Get seminar request with all lecturer details for scheduling
 export const getSeminarForScheduling = query({

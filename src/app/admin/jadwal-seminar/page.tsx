@@ -294,6 +294,7 @@ export default function JadwalSeminarPage() {
                     onSelectSlot={handleSelectSlot}
                     onCheckNextWeek={handleCheckNextWeek}
                     requiredDuration={availableSlots.requiredDuration}
+                    alternativeDuration={availableSlots.alternativeDuration}
                   />
                 )}
               </div>
