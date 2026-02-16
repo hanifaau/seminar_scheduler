@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import {
   Calendar,
   Clock,
@@ -12,6 +12,10 @@ import {
   ChevronRight,
   FileText,
   MapPin,
+  MessageSquare,
+  Send,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from 'convex/_generated/api';
@@ -52,6 +56,7 @@ interface Lecturer {
   _id: string;
   name: string;
   nip: string;
+  phone?: string;
   expertise: string[];
   status?: string;
 }
@@ -73,12 +78,24 @@ interface SeminarRequest {
   status: string;
 }
 
+interface NotificationResult {
+  lecturer: string;
+  role: string;
+  success: boolean;
+  message: string;
+}
+
 export default function JadwalSeminarPage() {
   const [selectedRequest, setSelectedRequest] = React.useState<SeminarRequest | null>(null);
   const [selectedSlot, setSelectedSlot] = React.useState<TimeSlot | null>(null);
   const [room, setRoom] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [weeksAhead, setWeeksAhead] = React.useState(2);
+
+  // WhatsApp notification states
+  const [sendNotification, setSendNotification] = React.useState(false);
+  const [isSendingNotification, setIsSendingNotification] = React.useState(false);
+  const [notificationResults, setNotificationResults] = React.useState<NotificationResult[] | null>(null);
 
   // Queries
   const requests = useQuery(api.seminar_requests.getByStatusWithLecturers, { status: 'allocated' });
@@ -89,17 +106,21 @@ export default function JadwalSeminarPage() {
       : 'skip'
   );
 
-  // Mutations
+  // Mutations & Actions
   const scheduleSeminar = useMutation(api.scheduling.scheduleSeminar);
+  const sendSeminarNotifications = useAction(api.notifications.sendSeminarNotifications);
 
   const handleSelectRequest = (request: SeminarRequest) => {
     setSelectedRequest(request);
     setSelectedSlot(null);
     setRoom('');
+    setSendNotification(false);
+    setNotificationResults(null);
   };
 
   const handleSelectSlot = (slot: TimeSlot) => {
     setSelectedSlot(slot);
+    setNotificationResults(null);
   };
 
   const handleCheckNextWeek = () => {
@@ -113,7 +134,10 @@ export default function JadwalSeminarPage() {
     }
 
     setIsSubmitting(true);
+    setNotificationResults(null);
+
     try {
+      // First, schedule the seminar
       await scheduleSeminar({
         id: selectedRequest._id as any,
         scheduledDate: selectedSlot.date,
@@ -123,15 +147,54 @@ export default function JadwalSeminarPage() {
       });
 
       toast.success('Seminar berhasil dijadwalkan');
-      setSelectedRequest(null);
-      setSelectedSlot(null);
-      setRoom('');
-      setWeeksAhead(2);
+
+      // Then, send WhatsApp notification if checkbox is checked
+      if (sendNotification) {
+        setIsSendingNotification(true);
+        try {
+          const results = await sendSeminarNotifications({
+            seminarRequestId: selectedRequest._id as any,
+          });
+          setNotificationResults(results.results);
+
+          const successCount = results.results.filter((r: NotificationResult) => r.success).length;
+          const totalCount = results.results.length;
+
+          if (results.success) {
+            toast.success(`Notifikasi WhatsApp berhasil dikirim ke ${successCount}/${totalCount} dosen`);
+          } else {
+            toast.warning(`Notifikasi terkirim ke ${successCount}/${totalCount} dosen. Beberapa gagal.`);
+          }
+        } catch (notifError: any) {
+          console.error('Notification error:', notifError);
+          toast.error(`Gagal mengirim notifikasi: ${notifError.message}`);
+        } finally {
+          setIsSendingNotification(false);
+        }
+      }
+
+      // Reset form after a delay if notifications were sent, or immediately if not
+      if (!sendNotification) {
+        setSelectedRequest(null);
+        setSelectedSlot(null);
+        setRoom('');
+        setWeeksAhead(2);
+        setSendNotification(false);
+      }
     } catch (error: any) {
       toast.error(error.message || 'Gagal menjadwalkan seminar');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleReset = () => {
+    setSelectedRequest(null);
+    setSelectedSlot(null);
+    setRoom('');
+    setWeeksAhead(2);
+    setSendNotification(false);
+    setNotificationResults(null);
   };
 
   const isLoading = requests === undefined;
@@ -272,8 +335,7 @@ export default function JadwalSeminarPage() {
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <Clock className="h-3 w-3" />
                     <span>
-                      Durasi:{' '}
-                      {selectedRequest.type === 'Proposal' ? '60' : '90'} menit
+                      Durasi: {selectedRequest.type === 'Proposal' ? '60' : '90'} menit
                     </span>
                   </div>
                 </div>
@@ -309,25 +371,78 @@ export default function JadwalSeminarPage() {
                 />
               )}
 
+              {/* WhatsApp Notification Option */}
+              {selectedSlot && (
+                <div className="rounded-lg border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30 p-4">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sendNotification}
+                      onChange={(e) => setSendNotification(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <MessageSquare className="h-4 w-4 text-green-600" />
+                        Kirim Notifikasi WhatsApp?
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Notifikasi akan dikirim ke semua dosen yang terlibat (Pembimbing &amp; Penguji)
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Notification Status */}
+                  {isSendingNotification && (
+                    <div className="mt-3 flex items-center gap-2 text-sm text-blue-600">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Mengirim notifikasi WhatsApp...
+                    </div>
+                  )}
+
+                  {notificationResults && notificationResults.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-medium text-foreground">Status Pengiriman:</p>
+                      <div className="space-y-1">
+                        {notificationResults.map((result, idx) => (
+                          <div
+                            key={idx}
+                            className={cn(
+                              'flex items-center gap-2 text-xs p-2 rounded',
+                              result.success
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                            )}
+                          >
+                            {result.success ? (
+                              <CheckCircle className="h-3 w-3" />
+                            ) : (
+                              <XCircle className="h-3 w-3" />
+                            )}
+                            <span className="font-medium">{result.lecturer}</span>
+                            <span className="text-muted-foreground">({result.role})</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="flex gap-3">
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => {
-                    setSelectedRequest(null);
-                    setSelectedSlot(null);
-                    setRoom('');
-                    setWeeksAhead(2);
-                  }}
-                  disabled={isSubmitting}
+                  onClick={handleReset}
+                  disabled={isSubmitting || isSendingNotification}
                 >
                   Batal
                 </Button>
                 <Button
                   className="flex-1"
                   onClick={handleSchedule}
-                  disabled={!selectedSlot || isSubmitting}
+                  disabled={!selectedSlot || isSubmitting || isSendingNotification}
                 >
                   {isSubmitting ? (
                     <>
@@ -342,6 +457,13 @@ export default function JadwalSeminarPage() {
                   )}
                 </Button>
               </div>
+
+              {/* Notification info when sending */}
+              {sendNotification && selectedSlot && (
+                <p className="text-xs text-center text-muted-foreground">
+                  Setelah penjadwalan berhasil, notifikasi WhatsApp akan dikirim ke semua dosen
+                </p>
+              )}
             </div>
           )}
         </div>

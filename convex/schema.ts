@@ -6,6 +6,7 @@ export default defineSchema({
   lecturers: defineTable({
     name: v.string(),
     nip: v.string(), // NIP is the Indonesian employee identification number
+    phone: v.optional(v.string()), // Phone number for WhatsApp notifications
     expertise: v.array(v.string()), // Array of expertise areas
     status: v.optional(v.string()), // e.g., "active", "on leave", "inactive"
     role: v.optional(v.union(
