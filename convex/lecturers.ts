@@ -22,15 +22,27 @@ export const create = mutation({
   args: {
     name: v.string(),
     nip: v.string(),
-    expertise: v.array(v.string()),
+    phone: v.optional(v.string()),
+    expertise: v.optional(v.array(v.string())),
     status: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Check if NIP already exists
+    const existing = await ctx.db
+      .query('lecturers')
+      .withIndex('by_nip', (q) => q.eq('nip', args.nip))
+      .first();
+
+    if (existing) {
+      throw new Error(`Dosen dengan NIP ${args.nip} sudah ada`);
+    }
+
     const now = Date.now();
     const lecturerId = await ctx.db.insert('lecturers', {
       name: args.name,
       nip: args.nip,
-      expertise: args.expertise,
+      phone: args.phone,
+      expertise: args.expertise ?? [],
       status: args.status ?? 'active',
       createdAt: now,
     });
@@ -44,6 +56,7 @@ export const update = mutation({
     id: v.id('lecturers'),
     name: v.optional(v.string()),
     nip: v.optional(v.string()),
+    phone: v.optional(v.string()),
     expertise: v.optional(v.array(v.string())),
     status: v.optional(v.string()),
   },
@@ -51,7 +64,19 @@ export const update = mutation({
     const { id, ...updates } = args;
     const existing = await ctx.db.get(id);
     if (!existing) {
-      throw new Error('Lecturer not found');
+      throw new Error('Dosen tidak ditemukan');
+    }
+
+    // If updating NIP, check for duplicates
+    if (updates.nip && updates.nip !== existing.nip) {
+      const duplicate = await ctx.db
+        .query('lecturers')
+        .withIndex('by_nip', (q) => q.eq('nip', updates.nip!))
+        .first();
+
+      if (duplicate && duplicate._id !== id) {
+        throw new Error(`Dosen dengan NIP ${updates.nip} sudah ada`);
+      }
     }
 
     const updateData: Record<string, unknown> = {
@@ -66,6 +91,27 @@ export const update = mutation({
 
     await ctx.db.patch(id, updateData);
     return id;
+  },
+});
+
+// Update lecturer expertise
+export const updateExpertise = mutation({
+  args: {
+    id: v.id('lecturers'),
+    expertise: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.id);
+    if (!existing) {
+      throw new Error('Dosen tidak ditemukan');
+    }
+
+    await ctx.db.patch(args.id, {
+      expertise: args.expertise,
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
   },
 });
 

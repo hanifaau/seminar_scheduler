@@ -56,10 +56,11 @@ export default defineSchema({
 
   // Expertise categories table - stores predefined expertise areas
   expertise_categories: defineTable({
-    fieldName: v.string(), // e.g., "Machine Learning", "Database Systems"
+    name: v.string(), // e.g., "Manajemen Produksi", "Ergonomi"
     description: v.optional(v.string()),
     createdAt: v.number(),
-  }),
+  })
+    .index('by_name', ['name']),
 
   // Seminar requests table - stores student seminar requests
   seminar_requests: defineTable({
