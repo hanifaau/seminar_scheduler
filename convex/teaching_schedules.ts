@@ -21,7 +21,9 @@ export const getAll = query({
 export const create = mutation({
   args: {
     lecturerId: v.id('lecturers'),
+    courseId: v.optional(v.id('courses')),
     day: v.string(),
+    shiftId: v.optional(v.string()),
     startTime: v.string(),
     endTime: v.string(),
     activity: v.string(),
@@ -32,7 +34,9 @@ export const create = mutation({
     const now = Date.now();
     const scheduleId = await ctx.db.insert('teaching_schedules', {
       lecturerId: args.lecturerId,
+      courseId: args.courseId,
       day: args.day,
+      shiftId: args.shiftId,
       startTime: args.startTime,
       endTime: args.endTime,
       activity: args.activity,
@@ -40,6 +44,92 @@ export const create = mutation({
       notes: args.notes,
       createdAt: now,
     });
+    return scheduleId;
+  },
+});
+
+// Create schedule with validation (for manual scheduling)
+export const createWithValidation = mutation({
+  args: {
+    lecturerId: v.id('lecturers'),
+    courseId: v.optional(v.id('courses')),
+    day: v.string(),
+    shiftId: v.optional(v.string()),
+    startTime: v.string(),
+    endTime: v.string(),
+    activity: v.string(),
+    room: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Helper function to convert time to minutes
+    const toMinutes = (time: string): number => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+
+    // Check for lecturer conflicts
+    const lecturerSchedules = await ctx.db
+      .query('teaching_schedules')
+      .withIndex('by_lecturer_day', (q) =>
+        q.eq('lecturerId', args.lecturerId).eq('day', args.day)
+      )
+      .collect();
+
+    const newStart = toMinutes(args.startTime);
+    const newEnd = toMinutes(args.endTime);
+
+    for (const schedule of lecturerSchedules) {
+      const existingStart = toMinutes(schedule.startTime);
+      const existingEnd = toMinutes(schedule.endTime);
+
+      // Check for overlap
+      if (newStart < existingEnd && newEnd > existingStart) {
+        throw new Error(
+          `Dosen sudah memiliki jadwal "${schedule.activity}" pada ${args.day} (${schedule.startTime} - ${schedule.endTime})`
+        );
+      }
+    }
+
+    // Check for room conflicts if room is specified
+    if (args.room) {
+      const allSchedules = await ctx.db
+        .query('teaching_schedules')
+        .withIndex('by_day', (q) => q.eq('day', args.day))
+        .collect();
+
+      const roomSchedules = allSchedules.filter(
+        (s) => s.room?.toLowerCase() === args.room!.toLowerCase()
+      );
+
+      for (const schedule of roomSchedules) {
+        const existingStart = toMinutes(schedule.startTime);
+        const existingEnd = toMinutes(schedule.endTime);
+
+        // Check for overlap
+        if (newStart < existingEnd && newEnd > existingStart) {
+          throw new Error(
+            `Ruangan ${args.room} sudah digunakan pada ${args.day} (${schedule.startTime} - ${schedule.endTime})`
+          );
+        }
+      }
+    }
+
+    // No conflicts, create schedule
+    const now = Date.now();
+    const scheduleId = await ctx.db.insert('teaching_schedules', {
+      lecturerId: args.lecturerId,
+      courseId: args.courseId,
+      day: args.day,
+      shiftId: args.shiftId,
+      startTime: args.startTime,
+      endTime: args.endTime,
+      activity: args.activity,
+      room: args.room,
+      notes: args.notes,
+      createdAt: now,
+    });
+
     return scheduleId;
   },
 });
@@ -158,14 +248,50 @@ export const getAllWithLecturer = query({
     const schedulesWithLecturer = await Promise.all(
       schedules.map(async (schedule) => {
         const lecturer = await ctx.db.get(schedule.lecturerId);
+        const course = schedule.courseId ? await ctx.db.get(schedule.courseId) : null;
         return {
           ...schedule,
           lecturer,
+          course,
         };
       })
     );
 
     return schedulesWithLecturer;
+  },
+});
+
+// Get schedules by lecturer and day (for conflict checking)
+export const getByLecturerAndDay = query({
+  args: {
+    lecturerId: v.id('lecturers'),
+    day: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query('teaching_schedules')
+      .withIndex('by_lecturer_day', (q) =>
+        q.eq('lecturerId', args.lecturerId).eq('day', args.day)
+      )
+      .collect();
+  },
+});
+
+// Get schedules by room and day (for conflict checking)
+export const getByRoomAndDay = query({
+  args: {
+    room: v.string(),
+    day: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const allSchedules = await ctx.db
+      .query('teaching_schedules')
+      .withIndex('by_day', (q) => q.eq('day', args.day))
+      .collect();
+
+    return allSchedules.filter(
+      (s) => s.room?.toLowerCase() === args.room.toLowerCase()
+    );
   },
 });
 

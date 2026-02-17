@@ -39,12 +39,27 @@ export default defineSchema({
     .index('by_idPegawai', ['idPegawai'])
     .index('by_role', ['role']),
 
+  // Courses table - stores course information
+  courses: defineTable({
+    code: v.string(), // e.g., "TI101"
+    name: v.string(), // e.g., "Metode Statistik"
+    sks: v.number(), // Credit units: 2 or 3
+    semester: v.optional(v.number()), // e.g., 1-8
+    description: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index('by_code', ['code'])
+    .index('by_sks', ['sks']),
+
   // Teaching schedules table - stores teaching schedule entries
   teaching_schedules: defineTable({
     lecturerId: v.id('lecturers'),
-    day: v.string(), // e.g., "Monday", "Tuesday", etc.
-    startTime: v.string(), // e.g., "08:00"
-    endTime: v.string(), // e.g., "10:00"
+    courseId: v.optional(v.id('courses')), // Reference to course
+    day: v.string(), // e.g., "Senin", "Selasa", etc.
+    shiftId: v.optional(v.string()), // e.g., "2sks-1", "3sks-2"
+    startTime: v.string(), // e.g., "07:30"
+    endTime: v.string(), // e.g., "09:10"
     activity: v.string(), // e.g., "Teaching", "Meeting", "Consultation"
     room: v.optional(v.string()),
     notes: v.optional(v.string()),
@@ -52,7 +67,10 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
   })
     .index('by_lecturer', ['lecturerId'])
-    .index('by_day', ['day']),
+    .index('by_lecturer_day', ['lecturerId', 'day'])
+    .index('by_day', ['day'])
+    .index('by_course', ['courseId'])
+    .index('by_room_day', ['room', 'day']),
 
   // Expertise categories table - stores predefined expertise areas
   expertise_categories: defineTable({
