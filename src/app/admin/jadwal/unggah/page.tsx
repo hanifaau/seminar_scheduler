@@ -2,33 +2,33 @@
 
 import * as React from 'react';
 import { useQuery, useMutation } from 'convex/react';
-import { ArrowLeft, Loader2, Upload, FileText, Download, Check, X, AlertTriangle, Info } from 'lucide-react';
+import { ArrowLeft, Loader2, Upload, FileText, Download, Check, X, AlertTriangle, Info, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
 import Papa from 'papaparse';
+import { toast } from 'sonner';
 import { api } from 'convex/_generated/api';
 import { Button } from '@/components/atoms/Button';
 import { Badge } from '@/components/atoms/Badge';
 import { cn } from '@/lib/utils';
 
-// New simplified CSV format interfaces
-interface ParsedCourseRow {
+// Minimalist CSV format: Hari, Waktu, Mata Kuliah, Ruangan
+interface ParsedScheduleRow {
   _rowNumber: number;
   hari: string;
+  waktu: string;
   waktuMulai: string;
   waktuSelesai: string;
   mataKuliah: string;
-  dosen1NIP: string;
-  dosen2NIP: string;
-  dosen3NIP: string;
-  ruang: string;
+  ruangan: string;
   _isValid: boolean;
-  _lecturers: Array<{ nip: string; name?: string; id?: string; isNew?: boolean }>;
+  _courseFound: boolean;
+  _lecturerCount: number;
   _errors: string[];
 }
 
 // Skeleton components
 function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('skeleton', className)} />;
+  return <div className={cn('animate-pulse rounded-md bg-muted', className)} />;
 }
 
 function TableRowSkeleton() {
@@ -37,9 +37,8 @@ function TableRowSkeleton() {
       <td className="px-3 py-2"><Skeleton className="h-4 w-8" /></td>
       <td className="px-3 py-2"><Skeleton className="h-4 w-20" /></td>
       <td className="px-3 py-2"><Skeleton className="h-4 w-28" /></td>
-      <td className="px-3 py-2"><Skeleton className="h-4 w-32" /></td>
       <td className="px-3 py-2"><Skeleton className="h-4 w-40" /></td>
-      <td className="px-3 py-2"><Skeleton className="h-4 w-48" /></td>
+      <td className="px-3 py-2"><Skeleton className="h-4 w-24" /></td>
       <td className="px-3 py-2"><Skeleton className="h-6 w-16" /></td>
     </tr>
   );
@@ -68,13 +67,13 @@ function parseTimeRange(waktu: string): { start: string; end: string } | null {
   return null;
 }
 
-// Generate CSV template with simplified format
-function generateCourseScheduleTemplate(): string {
-  const headers = ['Hari', 'Waktu', 'Mata Kuliah', 'Dosen 1 (NIP)', 'Dosen 2 (NIP)', 'Dosen 3 (NIP)', 'Ruang'];
+// Generate CSV template with MINIMALIST format
+function generateMinimalistTemplate(): string {
+  const headers = ['Hari', 'Waktu', 'Mata Kuliah', 'Ruangan'];
   const sampleData = [
-    ['Senin', '07:30 - 10:00', 'Perencanaan Produksi', '198501012010011001', '-', '-', 'TI-01'],
-    ['Selasa', '10:00 - 12:30', 'Sistem Informasi Manajemen', '197805152005012001', '198203182010012001', '-', 'Lab Komputer 2'],
-    ['Rabu', '13:00 - 15:30', 'Statistika Industri', '198712052015032001', '-', '-', 'Ruang 304'],
+    ['Senin', '07:30 - 10:00', 'Perencanaan dan Pengendalian Produksi', 'Lab. Komputer 1'],
+    ['Selasa', '10:10 - 12:40', 'Metode Statistik', 'Ruang Kelas A'],
+    ['Rabu', '13:30 - 16:00', 'Ergonomi', 'Lab. Ergonomi'],
   ];
   const csvContent = [
     headers.join(','),
@@ -84,35 +83,40 @@ function generateCourseScheduleTemplate(): string {
 }
 
 export default function UnggahJadwalPage() {
-  const [parsedData, setParsedData] = React.useState<ParsedCourseRow[]>([]);
+  const [parsedData, setParsedData] = React.useState<ParsedScheduleRow[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
-  const [uploadStatus, setUploadStatus] = React.useState<{
-    type: 'success' | 'error' | null;
+  const [uploadResult, setUploadResult] = React.useState<{
+    slotsImported: number;
+    lecturersLinked: number;
+    coursesNotFound: string[];
     message: string;
-  }>({ type: null, message: '' });
-  const [newLecturerNIPs, setNewLecturerNIPs] = React.useState<Set<string>>(new Set());
+  } | null>(null);
 
   // Queries
-  const lecturers = useQuery(api.lecturers.getAll);
+  const courses = useQuery(api.courses.getAll);
 
   // Mutations
-  const importCourseSchedule = useMutation(api.teaching_schedules.importCourseSchedule);
+  const importFromMinimalistCSV = useMutation(api.teaching_schedules.importFromMinimalistCSV);
 
-  // Create NIP to lecturer map
-  const lecturerMap = React.useMemo(() => {
-    if (!lecturers) return new Map();
-    const map = new Map<string, { id: string; name: string }>();
-    lecturers.forEach((l) => {
-      map.set(l.nip, { id: l._id, name: l.name });
+  // Create course name lookup
+  const courseLookup = React.useMemo(() => {
+    if (!courses) return new Map();
+    const map = new Map<string, { id: string; name: string; lecturerCount: number }>();
+    courses.forEach((c) => {
+      map.set(c.name.toLowerCase().trim(), {
+        id: c._id,
+        name: c.name,
+        lecturerCount: c.lecturerIds?.length || 0,
+      });
     });
     return map;
-  }, [lecturers]);
+  }, [courses]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setNewLecturerNIPs(new Set());
+    setUploadResult(null);
 
     Papa.parse(file, {
       header: true,
@@ -120,25 +124,21 @@ export default function UnggahJadwalPage() {
       transformHeader: (header) => {
         const h = header.toLowerCase().trim().replace(/[_\s]+/g, '');
         if (h.includes('hari') || h.includes('day')) return 'hari';
-        if (h.includes('waktu') || h.includes('time')) return 'waktu';
+        if (h.includes('waktu') || h.includes('time') || h.includes('jam')) return 'waktu';
         if (h.includes('mata') || h.includes('kuliah') || h.includes('course') || h.includes('matkul')) return 'matakuliah';
-        if (h.includes('dosen1') || h === 'dosen1(nip)' || h === 'dosen1') return 'dosen1';
-        if (h.includes('dosen2') || h === 'dosen2(nip)' || h === 'dosen2') return 'dosen2';
-        if (h.includes('dosen3') || h === 'dosen3(nip)' || h === 'dosen3') return 'dosen3';
-        if (h.includes('ruang') || h.includes('room')) return 'ruang';
+        if (h.includes('ruang') || h.includes('room') || h.includes('ruangan')) return 'ruangan';
         return h;
       },
       complete: (results) => {
         const data = results.data as Record<string, string>[];
-        const validated: ParsedCourseRow[] = [];
-        const newNIPs = new Set<string>();
+        const validated: ParsedScheduleRow[] = [];
+        const coursesNotFoundSet = new Set<string>();
 
         data
           .filter((row) => row.hari || row.waktu || row.matakuliah)
           .forEach((row, index) => {
             const errors: string[] = [];
             const rowNumber = index + 2;
-            const lecturersFound: ParsedCourseRow['_lecturers'] = [];
 
             // Validate Hari
             if (!row.hari?.trim()) {
@@ -147,7 +147,7 @@ export default function UnggahJadwalPage() {
               errors.push(`Hari "${row.hari}" tidak valid`);
             }
 
-            // Validate Waktu (parse range)
+            // Validate Waktu
             let waktuMulai = '';
             let waktuSelesai = '';
             if (!row.waktu?.trim()) {
@@ -163,70 +163,43 @@ export default function UnggahJadwalPage() {
             }
 
             // Validate Mata Kuliah
+            let courseFound = false;
+            let lecturerCount = 0;
             if (!row.matakuliah?.trim()) {
               errors.push('Mata kuliah wajib diisi');
-            }
-
-            // Process Dosen 1, 2, 3
-            const dosenNIPs = [
-              { nip: row.dosen1?.trim(), label: 'Dosen 1' },
-              { nip: row.dosen2?.trim(), label: 'Dosen 2' },
-              { nip: row.dosen3?.trim(), label: 'Dosen 3' },
-            ];
-
-            let hasAtLeastOneLecturer = false;
-            dosenNIPs.forEach(({ nip, label }) => {
-              if (nip && nip !== '-' && nip !== '') {
-                hasAtLeastOneLecturer = true;
-                const existingLecturer = lecturerMap.get(nip);
-                if (existingLecturer) {
-                  lecturersFound.push({
-                    nip,
-                    name: existingLecturer.name,
-                    id: existingLecturer.id,
-                    isNew: false,
-                  });
-                } else {
-                  // Mark as new lecturer to be created
-                  lecturersFound.push({
-                    nip,
-                    name: `Dosen ${nip}`,
-                    isNew: true,
-                  });
-                  newNIPs.add(nip);
+            } else {
+              const course = courseLookup.get(row.matakuliah.trim().toLowerCase());
+              if (course) {
+                courseFound = true;
+                lecturerCount = course.lecturerCount;
+                if (lecturerCount === 0) {
+                  errors.push('Mata kuliah belum memiliki dosen pengampu');
                 }
+              } else {
+                coursesNotFoundSet.add(row.matakuliah.trim());
+                errors.push(`Mata kuliah "${row.matakuliah}" tidak ditemukan di Master`);
               }
-            });
-
-            if (!hasAtLeastOneLecturer) {
-              errors.push('Minimal satu dosen (NIP) harus diisi');
             }
 
             validated.push({
               _rowNumber: rowNumber,
               hari: row.hari?.trim() || '',
+              waktu: row.waktu?.trim() || '',
               waktuMulai,
               waktuSelesai,
               mataKuliah: row.matakuliah?.trim() || '',
-              dosen1NIP: dosenNIPs[0].nip || '',
-              dosen2NIP: dosenNIPs[1].nip || '',
-              dosen3NIP: dosenNIPs[2].nip || '',
-              ruang: row.ruang?.trim() || '',
+              ruangan: row.ruangan?.trim() || '',
               _isValid: errors.length === 0,
-              _lecturers: lecturersFound,
+              _courseFound: courseFound,
+              _lecturerCount: lecturerCount,
               _errors: errors.length > 0 ? errors : undefined,
             });
           });
 
-        setNewLecturerNIPs(newNIPs);
         setParsedData(validated);
-        setUploadStatus({ type: null, message: '' });
       },
       error: (error) => {
-        setUploadStatus({
-          type: 'error',
-          message: `Gagal membaca file CSV: ${error.message}`,
-        });
+        toast.error(`Gagal membaca file CSV: ${error.message}`);
       },
     });
   };
@@ -235,54 +208,51 @@ export default function UnggahJadwalPage() {
     const validRows = parsedData.filter((row) => row._isValid);
 
     if (validRows.length === 0) {
-      setUploadStatus({ type: 'error', message: 'Tidak ada data valid untuk diunggah' });
+      toast.error('Tidak ada data valid untuk diunggah');
       return;
     }
 
     setIsUploading(true);
-    setUploadStatus({ type: null, message: '' });
 
     try {
       // Prepare data for import
       const schedulesToImport = validRows.map((row) => ({
         day: row.hari,
-        startTime: row.waktuMulai,
-        endTime: row.waktuSelesai,
+        time: row.waktu,
         courseName: row.mataKuliah,
-        room: row.ruang,
-        lecturerNIPs: row._lecturers.map((l) => l.nip),
+        room: row.ruangan,
       }));
 
-      const result = await importCourseSchedule({ schedules: schedulesToImport });
+      const result = await importFromMinimalistCSV({ schedules: schedulesToImport });
 
-      setUploadStatus({
-        type: 'success',
-        message: `Berhasil mengimpor ${result.schedulesCreated} jadwal, ${result.lecturersCreated} dosen baru dibuat`,
+      setUploadResult({
+        slotsImported: result.slotsImported,
+        lecturersLinked: result.lecturersLinked,
+        coursesNotFound: result.coursesNotFound,
+        message: result.message,
       });
+
+      toast.success(result.message);
       setParsedData([]);
-      setNewLecturerNIPs(new Set());
     } catch (error) {
-      setUploadStatus({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Gagal mengunggah jadwal',
-      });
+      toast.error(error instanceof Error ? error.message : 'Gagal mengunggah jadwal');
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleDownloadTemplate = () => {
-    const csvContent = generateCourseScheduleTemplate();
+    const csvContent = generateMinimalistTemplate();
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'template_jadwal_kuliah.csv';
+    link.download = 'template_jadwal_minimalis.csv';
     link.click();
   };
 
   const validRows = parsedData.filter((row) => row._isValid);
   const invalidRows = parsedData.filter((row) => !row._isValid);
-  const isLoading = lecturers === undefined;
+  const isLoading = courses === undefined;
 
   return (
     <div className="space-y-6">
@@ -296,7 +266,7 @@ export default function UnggahJadwalPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Unggah Jadwal Kuliah</h1>
           <p className="text-muted-foreground">
-            Import jadwal kuliah dari file CSV (format sederhana)
+            Import jadwal kuliah dari CSV dengan auto-mapping ke Master Mata Kuliah
           </p>
         </div>
       </div>
@@ -309,35 +279,61 @@ export default function UnggahJadwalPage() {
       )}
 
       {/* Upload Form */}
-      {!isLoading && parsedData.length === 0 && (
+      {!isLoading && parsedData.length === 0 && !uploadResult && (
         <>
           {/* Instructions */}
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30 p-4">
             <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-              <div className="space-y-2 text-sm">
-                <p className="font-medium text-foreground">Format CSV yang Diharapkan:</p>
-                <div className="bg-background rounded p-3 font-mono text-xs overflow-x-auto">
-                  <p className="text-muted-foreground"># Kolom: Hari, Waktu, Mata Kuliah, Dosen 1 (NIP), Dosen 2 (NIP), Dosen 3 (NIP), Ruang</p>
-                  <p className="text-muted-foreground"># Contoh: Senin, "07:30 - 10:00", "Perencanaan Produksi", "198501012010011001", "-", "-", "TI-01"</p>
+              <Info className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
+              <div className="space-y-3 text-sm">
+                <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                  Format CSV Minimalis (Auto-Mapping)
+                </p>
+                <div className="bg-background rounded p-3 font-mono text-xs overflow-x-auto border">
+                  <p className="text-muted-foreground"># Kolom: Hari, Waktu, Mata Kuliah, Ruangan</p>
+                  <p className="text-muted-foreground"># Contoh: Senin, "07:30 - 10:00", "Metode Statistik", "Lab. Komputer 1"</p>
                 </div>
-                <ul className="text-muted-foreground space-y-1 list-disc list-inside">
-                  <li><strong>Pastikan format waktu adalah HH:mm - HH:mm</strong> (contoh: 07:30 - 10:00)</li>
-                  <li>Gunakan tanda <code className="bg-muted px-1 rounded">-</code> untuk dosen yang kosong</li>
-                  <li>NIP yang belum terdaftar akan dibuat otomatis</li>
-                </ul>
+                <div className="space-y-2 text-emerald-700 dark:text-emerald-400">
+                  <p className="font-medium flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4" />
+                    Cara Kerja Auto-Mapping:
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1 text-xs">
+                    <li>Sistem mencari mata kuliah berdasarkan <strong>nama yang sama persis</strong></li>
+                    <li>Automatis mengambil daftar <strong>Tim Dosen Pengampu</strong> dari Master</li>
+                    <li>Membuat jadwal untuk <strong>setiap dosen</strong> yang terdaftar</li>
+                  </ol>
+                </div>
+                <div className="rounded bg-amber-100 dark:bg-amber-900/30 p-2 text-xs text-amber-800 dark:text-amber-300">
+                  <strong>Important:</strong> Pastikan Nama Mata Kuliah di CSV <strong>sama persis</strong> dengan yang ada di Master Mata Kuliah!
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Upload Area with Buttons */}
+          {/* Quick Link to Master Courses */}
+          <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+            <div>
+              <p className="font-medium text-foreground">Master Mata Kuliah</p>
+              <p className="text-xs text-muted-foreground">
+                Pastikan mata kuliah dan dosen pengampu sudah diatur sebelum import
+              </p>
+            </div>
+            <Link href="/admin/courses">
+              <Button variant="outline" size="sm">
+                Kelola Master MK
+              </Button>
+            </Link>
+          </div>
+
+          {/* Upload Area */}
           <div className="border-2 border-dashed rounded-lg p-8 text-center">
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="font-medium text-foreground mb-2">
               Seret file CSV ke sini atau klik untuk memilih
             </p>
             <p className="text-sm text-muted-foreground mb-6">
-              Format: <strong>Hari, Waktu, Mata Kuliah, Dosen 1-3 (NIP), Ruang</strong>
+              Format: <strong>Hari, Waktu, Mata Kuliah, Ruangan</strong>
             </p>
 
             <input
@@ -355,7 +351,7 @@ export default function UnggahJadwalPage() {
                 Unduh Template CSV
               </Button>
               <label htmlFor="schedule-csv-upload">
-                <Button className="cursor-pointer" asChild>
+                <Button className="cursor-pointer bg-emerald-600 hover:bg-emerald-700" asChild>
                   <span>
                     <FileText className="h-4 w-4 mr-2" />
                     Pilih File CSV
@@ -364,20 +360,6 @@ export default function UnggahJadwalPage() {
               </label>
             </div>
           </div>
-
-          {/* Status Message */}
-          {uploadStatus.type && (
-            <div
-              className={cn(
-                'p-4 rounded-lg',
-                uploadStatus.type === 'success'
-                  ? 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-900/20 dark:text-green-200 dark:border-green-800'
-                  : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/20 dark:text-red-200 dark:border-red-800'
-              )}
-            >
-              {uploadStatus.message}
-            </div>
-          )}
         </>
       )}
 
@@ -387,7 +369,7 @@ export default function UnggahJadwalPage() {
           {/* Summary */}
           <div className="flex flex-wrap items-center gap-4 p-4 rounded-lg bg-muted/50">
             <div className="flex items-center gap-2">
-              <Check className="h-5 w-5 text-green-500" />
+              <Check className="h-5 w-5 text-emerald-500" />
               <span className="font-medium text-foreground">{validRows.length} data valid</span>
             </div>
             {invalidRows.length > 0 && (
@@ -396,33 +378,15 @@ export default function UnggahJadwalPage() {
                 <span className="font-medium text-foreground">{invalidRows.length} data tidak valid</span>
               </div>
             )}
-            {newLecturerNIPs.size > 0 && (
+            {validRows.length > 0 && (
               <div className="flex items-center gap-2">
-                <Info className="h-5 w-5 text-blue-500" />
-                <span className="font-medium text-foreground">{newLecturerNIPs.size} dosen baru akan dibuat</span>
+                <LinkIcon className="h-5 w-5 text-blue-500" />
+                <span className="font-medium text-foreground">
+                  Akan dihubungkan ke {validRows.reduce((sum, r) => sum + r._lecturerCount, 0)} jadwal dosen
+                </span>
               </div>
             )}
           </div>
-
-          {/* New Lecturers Warning */}
-          {newLecturerNIPs.size > 0 && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20 p-4">
-              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2 flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                Dosen Baru Akan Dibuat Otomatis:
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {Array.from(newLecturerNIPs).map((nip) => (
-                  <Badge key={nip} variant="outline" className="text-blue-700 dark:text-blue-300">
-                    {nip}
-                  </Badge>
-                ))}
-              </div>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                Nama dosen akan menggunakan placeholder. Silakan update nama dosen setelah import.
-              </p>
-            </div>
-          )}
 
           {/* Table */}
           <div className="rounded-lg border overflow-hidden">
@@ -434,8 +398,8 @@ export default function UnggahJadwalPage() {
                     <th className="px-3 py-2 text-left font-medium text-foreground">Hari</th>
                     <th className="px-3 py-2 text-left font-medium text-foreground">Waktu</th>
                     <th className="px-3 py-2 text-left font-medium text-foreground">Mata Kuliah</th>
+                    <th className="px-3 py-2 text-left font-medium text-foreground">Ruangan</th>
                     <th className="px-3 py-2 text-left font-medium text-foreground">Dosen</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Ruang</th>
                     <th className="px-3 py-2 text-left font-medium text-foreground">Status</th>
                   </tr>
                 </thead>
@@ -456,20 +420,21 @@ export default function UnggahJadwalPage() {
                       <td className="px-3 py-2 max-w-[200px] truncate" title={row.mataKuliah}>
                         {row.mataKuliah}
                       </td>
+                      <td className="px-3 py-2">{row.ruangan || '-'}</td>
                       <td className="px-3 py-2">
-                        <div className="flex flex-wrap gap-1">
-                          {row._lecturers.map((lecturer, idx) => (
-                            <Badge
-                              key={idx}
-                              variant={lecturer.isNew ? 'info' : 'secondary'}
-                              className="text-[10px]"
-                            >
-                              {lecturer.isNew ? `${lecturer.nip} (baru)` : lecturer.name}
-                            </Badge>
-                          ))}
-                        </div>
+                        {row._courseFound ? (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          >
+                            {row._lecturerCount} dosen
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-xs">
+                            Tidak ditemukan
+                          </Badge>
+                        )}
                       </td>
-                      <td className="px-3 py-2">{row.ruang || '-'}</td>
                       <td className="px-3 py-2">
                         {row._isValid ? (
                           <Badge variant="success" className="text-xs">
@@ -508,15 +473,17 @@ export default function UnggahJadwalPage() {
 
           {/* Actions */}
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => {
-              setParsedData([]);
-              setNewLecturerNIPs(new Set());
-            }} disabled={isUploading}>
+            <Button
+              variant="outline"
+              onClick={() => setParsedData([])}
+              disabled={isUploading}
+            >
               Batal
             </Button>
             <Button
               onClick={handleConfirmUpload}
               disabled={isUploading || validRows.length === 0}
+              className="bg-emerald-600 hover:bg-emerald-700"
             >
               {isUploading ? (
                 <>
@@ -524,24 +491,66 @@ export default function UnggahJadwalPage() {
                   Mengimpor...
                 </>
               ) : (
-                `Impor ${validRows.length} Data Valid`
+                `Impor ${validRows.length} Slot`
               )}
             </Button>
           </div>
         </div>
       )}
 
-      {/* Status Message (after upload) */}
-      {parsedData.length === 0 && uploadStatus.type && (
-        <div
-          className={cn(
-            'p-4 rounded-lg',
-            uploadStatus.type === 'success'
-              ? 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-900/20 dark:text-green-200 dark:border-green-800'
-              : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/20 dark:text-red-200 dark:border-red-800'
-          )}
-        >
-          {uploadStatus.message}
+      {/* Upload Result */}
+      {uploadResult && (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
+                <Check className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Import Berhasil!</h3>
+                <p className="text-sm text-muted-foreground">{uploadResult.message}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-background rounded p-3">
+                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                  {uploadResult.slotsImported}
+                </p>
+                <p className="text-xs text-muted-foreground">Slot berhasil diimpor</p>
+              </div>
+              <div className="bg-background rounded p-3">
+                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                  {uploadResult.lecturersLinked}
+                </p>
+                <p className="text-xs text-muted-foreground">Jadwal dosen dibuat</p>
+              </div>
+            </div>
+
+            {uploadResult.coursesNotFound.length > 0 && (
+              <div className="mt-4 p-3 rounded bg-amber-100 dark:bg-amber-900/30">
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                  Mata kuliah tidak ditemukan (dilewati):
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {uploadResult.coursesNotFound.map((name) => (
+                    <Badge key={name} variant="outline" className="text-xs">
+                      {name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setUploadResult(null)}>
+              Upload Lagi
+            </Button>
+            <Link href="/admin/courses">
+              <Button>Lihat Master MK</Button>
+            </Link>
+          </div>
         </div>
       )}
     </div>

@@ -312,6 +312,113 @@ export const removeAllByLecturer = mutation({
   },
 });
 
+// Import course schedules from MINIMALIST CSV with AUTO-MAPPING
+// Format: Hari, Waktu, Mata Kuliah, Ruangan
+// Logic: Find course by name, get lecturerIds, create schedule for each lecturer
+export const importFromMinimalistCSV = mutation({
+  args: {
+    schedules: v.array(
+      v.object({
+        day: v.string(),           // e.g., "Senin"
+        time: v.string(),          // e.g., "07:30 - 09:10"
+        courseName: v.string(),    // Must match EXACTLY with Master Course name
+        room: v.string(),          // e.g., "Lab. Komputer 1"
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    let slotsImported = 0;
+    let lecturersLinked = 0;
+    let coursesNotFound: string[] = [];
+    let duplicatesSkipped = 0;
+
+    // Build course name -> course mapping
+    const allCourses = await ctx.db.query('courses').collect();
+    const courseMap = new Map<string, typeof allCourses[0]>();
+    for (const course of allCourses) {
+      courseMap.set(course.name.toLowerCase().trim(), course);
+    }
+
+    // Get all existing schedules to check for duplicates
+    const existingSchedules = await ctx.db.query('teaching_schedules').collect();
+    const scheduleKeys = new Set<string>();
+    for (const schedule of existingSchedules) {
+      const key = `${schedule.lecturerId}-${schedule.day}-${schedule.startTime}-${schedule.endTime}`;
+      scheduleKeys.add(key);
+    }
+
+    // Process each schedule entry
+    for (const scheduleData of args.schedules) {
+      const { day, time, courseName, room } = scheduleData;
+
+      // Parse time range (format: "07:30 - 09:10" or "07:30-09:10")
+      const timeParts = time.split('-').map((t) => t.trim());
+      if (timeParts.length !== 2) {
+        console.log(`[Import] Invalid time format: ${time}`);
+        continue;
+      }
+      const [startTime, endTime] = timeParts;
+
+      // Find course by name (exact match, case-insensitive)
+      const course = courseMap.get(courseName.toLowerCase().trim());
+
+      if (!course) {
+        if (!coursesNotFound.includes(courseName)) {
+          coursesNotFound.push(courseName);
+        }
+        continue;
+      }
+
+      // Get lecturer IDs from course
+      const lecturerIds = course.lecturerIds;
+
+      if (lecturerIds.length === 0) {
+        console.log(`[Import] Course "${courseName}" has no lecturers assigned`);
+        continue;
+      }
+
+      // Create schedule entry for each lecturer
+      for (const lecturerId of lecturerIds) {
+        // Check for duplicate
+        const scheduleKey = `${lecturerId}-${day}-${startTime}-${endTime}`;
+        if (scheduleKeys.has(scheduleKey)) {
+          duplicatesSkipped++;
+          continue;
+        }
+
+        // Create schedule entry
+        await ctx.db.insert('teaching_schedules', {
+          lecturerId: lecturerId,
+          courseId: course._id,
+          day,
+          startTime,
+          endTime,
+          activity: course.name,
+          room: room || undefined,
+          createdAt: now,
+        });
+
+        scheduleKeys.add(scheduleKey);
+        lecturersLinked++;
+      }
+
+      slotsImported++;
+    }
+
+    console.log(`[Import] Complete: ${slotsImported} slots, ${lecturersLinked} lecturer schedules`);
+
+    return {
+      slotsImported,
+      lecturersLinked,
+      coursesNotFound,
+      duplicatesSkipped,
+      message: `${slotsImported} slot berhasil diimpor dan dihubungkan ke ${lecturersLinked} jadwal dosen`,
+    };
+  },
+});
+
+// Legacy import - kept for backwards compatibility
 // Import course schedules from CSV (handles 3 lecturer columns)
 // Auto-creates lecturers if NIP doesn't exist
 // Prevents duplicate entries

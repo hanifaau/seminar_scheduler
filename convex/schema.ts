@@ -39,17 +39,19 @@ export default defineSchema({
     .index('by_idPegawai', ['idPegawai'])
     .index('by_role', ['role']),
 
-  // Courses table - stores course information
+  // Courses table - stores course information (Master Mata Kuliah)
   courses: defineTable({
     code: v.string(), // e.g., "TI101"
-    name: v.string(), // e.g., "Metode Statistik"
+    name: v.string(), // e.g., "Metode Statistik" (unique, used for CSV mapping)
     sks: v.number(), // Credit units: 2 or 3
+    lecturerIds: v.array(v.id('lecturers')), // Array of lecturer IDs (Team Dosen Pengampu)
     semester: v.optional(v.number()), // e.g., 1-8
     description: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
   })
     .index('by_code', ['code'])
+    .index('by_name', ['name'])
     .index('by_sks', ['sks']),
 
   // Teaching schedules table - stores teaching schedule entries

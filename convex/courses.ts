@@ -9,6 +9,28 @@ export const getAll = query({
   },
 });
 
+// Get all courses with lecturer details
+export const getAllWithLecturers = query({
+  args: {},
+  handler: async (ctx) => {
+    const courses = await ctx.db.query('courses').order('asc').collect();
+
+    const coursesWithLecturers = await Promise.all(
+      courses.map(async (course) => {
+        const lecturers = await Promise.all(
+          course.lecturerIds.map((id) => ctx.db.get(id))
+        );
+        return {
+          ...course,
+          lecturers: lecturers.filter(Boolean),
+        };
+      })
+    );
+
+    return coursesWithLecturers;
+  },
+});
+
 // Get courses by SKS
 export const getBySks = query({
   args: { sks: v.number() },
@@ -28,24 +50,46 @@ export const get = query({
   },
 });
 
+// Get course by name (for CSV mapping)
+export const getByName = query({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query('courses')
+      .withIndex('by_name', (q) => q.eq('name', args.name))
+      .first();
+  },
+});
+
 // Create a new course
 export const create = mutation({
   args: {
     code: v.string(),
     name: v.string(),
     sks: v.number(),
+    lecturerIds: v.array(v.id('lecturers')),
     semester: v.optional(v.number()),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Check if course code already exists
-    const existing = await ctx.db
+    const existingByCode = await ctx.db
       .query('courses')
       .withIndex('by_code', (q) => q.eq('code', args.code))
       .first();
 
-    if (existing) {
+    if (existingByCode) {
       throw new Error(`Mata kuliah dengan kode ${args.code} sudah ada`);
+    }
+
+    // Check if course name already exists
+    const existingByName = await ctx.db
+      .query('courses')
+      .withIndex('by_name', (q) => q.eq('name', args.name))
+      .first();
+
+    if (existingByName) {
+      throw new Error(`Mata kuliah dengan nama "${args.name}" sudah ada`);
     }
 
     const now = Date.now();
@@ -53,6 +97,7 @@ export const create = mutation({
       code: args.code,
       name: args.name,
       sks: args.sks,
+      lecturerIds: args.lecturerIds,
       semester: args.semester,
       description: args.description,
       createdAt: now,
@@ -69,6 +114,7 @@ export const update = mutation({
     code: v.optional(v.string()),
     name: v.optional(v.string()),
     sks: v.optional(v.number()),
+    lecturerIds: v.optional(v.array(v.id('lecturers'))),
     semester: v.optional(v.number()),
     description: v.optional(v.string()),
   },
@@ -88,6 +134,18 @@ export const update = mutation({
 
       if (duplicate) {
         throw new Error(`Mata kuliah dengan kode ${updates.code} sudah ada`);
+      }
+    }
+
+    // If updating name, check for duplicates
+    if (updates.name && updates.name !== existing.name) {
+      const duplicate = await ctx.db
+        .query('courses')
+        .withIndex('by_name', (q) => q.eq('name', updates.name!))
+        .first();
+
+      if (duplicate) {
+        throw new Error(`Mata kuliah dengan nama "${updates.name}" sudah ada`);
       }
     }
 
@@ -148,7 +206,7 @@ export const search = query({
   },
 });
 
-// Seed default courses for TI Unand
+// Seed default courses for TI Unand (without lecturers - admin will assign later)
 export const seed = mutation({
   args: {},
   handler: async (ctx) => {
@@ -177,6 +235,7 @@ export const seed = mutation({
     for (const course of defaultCourses) {
       const id = await ctx.db.insert('courses', {
         ...course,
+        lecturerIds: [],
         createdAt: now,
       });
       insertedIds.push(id);
