@@ -1,0 +1,153 @@
+# TI Seminar Scheduler - Project Standards
+
+## Project Overview
+TI Seminar Scheduler is a web application for managing lecturer teaching schedules.
+Built with Next.js 14+ (App Router), TypeScript, Tailwind CSS, and Convex database.
+
+## Tech Stack
+- **Framework**: Next.js 14+ with App Router
+- **Language**: TypeScript (strict mode)
+- **Styling**: Tailwind CSS with CSS variables for theming
+- **Database**: Convex (real-time, serverless)
+- **UI Components**: Custom components following Atomic Design pattern
+- **CSV Parsing**: PapaParse
+
+## Project Structure
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── admin/             # Admin pages
+│   │   ├── lecturers/     # Lecturer management
+│   │   └── schedules/     # Schedule management
+│   ├── layout.tsx         # Root layout
+│   └── page.tsx           # Home page
+├── components/
+│   ├── atoms/             # Basic UI elements (Button, Input, Badge, Label)
+│   ├── molecules/         # Composite components (SearchInput, FilterDropdown, LecturerCard)
+│   ├── organisms/         # Complex components (Navbar, LecturerTable, ScheduleUploadForm, CSVPreview)
+│   └── templates/         # Page layouts (AdminLayout)
+├── lib/
+│   ├── csv-parser.ts      # CSV parsing and validation logic
+│   ├── convex-provider.tsx # Convex client provider
+│   └── utils.ts           # Utility functions (cn)
+convex/
+├── schema.ts              # Database schema definition
+├── lecturers.ts           # Lecturer CRUD operations
+├── staff.ts               # Staff CRUD operations
+├── teaching_schedules.ts  # Schedule CRUD operations
+└── expertise_categories.ts # Expertise category operations
+```
+
+## Coding Standards
+
+### TypeScript
+- Use strict type checking
+- Define interfaces for all data structures
+- Use `type` for object shapes, `interface` for extendable types
+- Avoid `any` type - use `unknown` when type is truly unknown
+
+### React Components
+- Use functional components with hooks
+- Use `'use client'` directive for client components
+- Follow Atomic Design pattern for components
+- Use `forwardRef` for components that need ref forwarding
+- Destructure props in component signature
+
+### Naming Conventions
+- Components: PascalCase (e.g., `LecturerTable.tsx`)
+- Functions: camelCase (e.g., `handleFileSelect`)
+- Constants: UPPER_SNAKE_CASE for global, camelCase for local
+- Files: Match the primary export name
+- CSS classes: Use Tailwind utility classes
+
+### Convex
+- Define all tables in `schema.ts`
+- Use indexes for frequently queried fields
+- Keep functions focused on single responsibility
+- Use `v.id('table')` for document references
+- Handle errors with descriptive messages
+
+### Styling
+- Use Tailwind CSS utility classes
+- Use CSS variables for theming (defined in globals.css)
+- Use `cn()` utility for conditional class merging
+- Follow mobile-first responsive design
+- Maintain consistent spacing using Tailwind's spacing scale
+
+### File Organization
+- One component per file
+- Export components as named exports
+- Keep files under 300 lines
+- Group related functionality in directories
+
+## Database Schema
+
+### lecturers
+- `name`: string - Lecturer's full name
+- `nip`: string - Indonesian employee ID (unique)
+- `expertise`: string[] - Areas of expertise
+- `status`: string - active | on leave | inactive
+
+### staff
+- `name`: string - Staff member's name
+- `nip`: string - Indonesian employee ID
+- `role`: "Admin" | "Kaprodi" (Head of Department)
+
+### teaching_schedules
+- `lecturerId`: Id<'lecturers'> - Reference to lecturer
+- `day`: string - Day of the week
+- `startTime`: string - Start time (HH:MM)
+- `endTime`: string - End time (HH:MM)
+- `activity`: string - Activity description
+- `room`: string (optional) - Room/location
+- `notes`: string (optional) - Additional notes
+
+### expertise_categories
+- `fieldName`: string - Name of expertise area
+- `description`: string (optional) - Description
+
+## API Conventions
+
+### Convex Functions
+- `get`: Fetch single document by ID
+- `getAll`: Fetch all documents
+- `create`: Create new document
+- `update`: Update existing document
+- `remove`: Delete document
+- `search`: Search with filters
+- `bulkInsert`: Insert multiple documents
+
+### CSV Upload
+Required columns: NIP, Day, StartTime, EndTime, Activity
+Optional columns: Room, Notes
+- NIP must match an existing lecturer
+- Time format: HH:MM (24-hour)
+- Day: English or Indonesian day names
+
+## Error Handling
+- Use descriptive error messages
+- Handle errors at component level
+- Display user-friendly error messages
+- Log errors for debugging (not in production)
+
+## Testing Guidelines
+- Test components in isolation
+- Mock Convex functions for unit tests
+- Test CSV parsing with various inputs
+- Test responsive layouts at different viewports
+
+## Git Commit Convention
+- `feat:` New feature
+- `fix:` Bug fix
+- `refactor:` Code refactoring
+- `style:` Styling changes
+- `docs:` Documentation
+- `test:` Testing
+- `chore:` Maintenance tasks
+
+## Accessibility
+- Use semantic HTML elements
+- Provide ARIA labels for interactive elements
+- Ensure keyboard navigation works
+- Maintain sufficient color contrast
+- Support screen readers

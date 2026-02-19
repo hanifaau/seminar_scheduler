@@ -13,6 +13,11 @@ interface NotificationPayload {
   room: string;
 }
 
+// Whapi.cloud API Configuration
+// Add these environment variables in Convex Dashboard:
+// - WHATSAPP_API_URL: https://gate.whapi.cloud
+// - WHATSAPP_API_KEY: your_api_token
+
 // Format date to Indonesian format
 function formatDateIndonesian(dateString: string): string {
   const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -49,7 +54,7 @@ Mohon kehadiran Bapak/Ibu tepat waktu. Terima kasih.
 Pesan ini dikirim otomatis oleh Sistem Penjadwalan Seminar TI Unand.`;
 }
 
-// Send WhatsApp notification to a single lecturer
+// Send WhatsApp notification to a single lecturer using Whapi.cloud API
 export const sendWhatsAppNotification = action({
   args: {
     lecturerName: v.string(),
@@ -63,13 +68,15 @@ export const sendWhatsAppNotification = action({
     room: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
-    // Get WhatsApp API configuration from environment variables
-    const whatsappApiUrl = process.env.WHATSAPP_API_URL;
-    const whatsappApiKey = process.env.WHATSAPP_API_KEY;
+    // Get WhatsApp API configuration from Convex environment variables
+    // Set these in Convex Dashboard > Settings > Environment Variables
+    const whatsappApiUrl = process.env.WHATSAPP_API_URL; // e.g., "https://gate.whapi.cloud"
+    const whatsappApiKey = process.env.WHATSAPP_API_KEY; // your API token
 
     // Validate environment variables
     if (!whatsappApiUrl || !whatsappApiKey) {
       console.log('[WhatsApp] Environment variables not configured. Logging message instead.');
+      console.log('[WhatsApp] Set WHATSAPP_API_URL and WHATSAPP_API_KEY in Convex Dashboard');
       const message = buildWhatsAppMessage({
         lecturerName: args.lecturerName,
         lecturerRole: args.lecturerRole,
@@ -108,7 +115,8 @@ export const sendWhatsAppNotification = action({
     });
 
     try {
-      // Format phone number (remove non-digits, ensure it starts with country code)
+      // Format phone number for Whapi.cloud
+      // Remove non-digits, ensure it starts with country code
       let phone = args.lecturerPhone.replace(/\D/g, '');
       if (phone.startsWith('0')) {
         phone = '62' + phone.substring(1);
@@ -116,16 +124,21 @@ export const sendWhatsAppNotification = action({
         phone = '62' + phone;
       }
 
-      // Send to WhatsApp API
-      const response = await fetch(whatsappApiUrl, {
+      // Whapi.cloud API endpoint for sending text messages
+      const endpoint = `${whatsappApiUrl}/messages/text`;
+
+      console.log(`[WhatsApp] Sending to ${args.lecturerName} at ${phone}`);
+
+      // Send to Whapi.cloud API
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${whatsappApiKey}`,
         },
         body: JSON.stringify({
-          phone: phone,
-          message: message,
+          to: phone,
+          body: message,
         }),
       });
 
@@ -138,7 +151,10 @@ export const sendWhatsAppNotification = action({
         };
       }
 
+      const responseData = await response.json();
+      console.log('[WhatsApp] API Response:', JSON.stringify(responseData));
       console.log(`[WhatsApp] Successfully sent notification to ${args.lecturerName}`);
+
       return {
         success: true,
         message: `Berhasil mengirim ke ${args.lecturerName}`,
