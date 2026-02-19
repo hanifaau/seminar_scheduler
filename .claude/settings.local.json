@@ -12,7 +12,8 @@
       "Bash(grep:*)",
       "mcp__5c39531f-4e03-4ab4-8c83-c64941ee2420__list_projects",
       "Bash(npx vercel:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(git remote set-url:*)"
     ]
   }
 }
