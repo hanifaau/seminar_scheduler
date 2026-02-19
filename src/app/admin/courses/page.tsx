@@ -338,7 +338,7 @@ export default function MasterCoursesPage() {
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {course.lecturers && course.lecturers.length > 0 ? (
-                    course.lecturers.map((lecturer) => (
+                    course.lecturers.filter((l) => l !== null).map((lecturer) => (
                       <Badge
                         key={lecturer._id}
                         variant="secondary"

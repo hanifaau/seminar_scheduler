@@ -361,8 +361,8 @@ export default function AlokasiPengujiPage() {
                   <SelectContent>
                     <SelectItem value="semua">Semua Kepakaran</SelectItem>
                     {expertiseCategories?.map((cat) => (
-                      <SelectItem key={cat._id} value={cat.fieldName}>
-                        {cat.fieldName}
+                      <SelectItem key={cat._id} value={cat.name}>
+                        {cat.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

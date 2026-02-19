@@ -9,7 +9,10 @@
       "mcp__5c39531f-4e03-4ab4-8c83-c64941ee2420__list_teams",
       "mcp__5c39531f-4e03-4ab4-8c83-c64941ee2420__deploy_to_vercel",
       "Bash(npx vercel deploy:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "mcp__5c39531f-4e03-4ab4-8c83-c64941ee2420__list_projects",
+      "Bash(npx vercel:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

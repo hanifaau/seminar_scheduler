@@ -192,7 +192,7 @@ export default function UnggahJadwalPage() {
               _isValid: errors.length === 0,
               _courseFound: courseFound,
               _lecturerCount: lecturerCount,
-              _errors: errors.length > 0 ? errors : undefined,
+              _errors: errors.length > 0 ? errors : [],
             });
           });
 

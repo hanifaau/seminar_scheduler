@@ -1,7 +1,6 @@
 import { action } from './_generated/server';
 import { v } from 'convex/values';
-import { getSeminarRequestById } from './seminar_requests';
-import { getLecturerById } from './lecturers';
+import { api } from './_generated/api';
 
 // Types for notification payload
 interface NotificationPayload {
@@ -180,8 +179,11 @@ export const sendSeminarNotifications = action({
     success: boolean;
     results: Array<{ lecturer: string; role: string; success: boolean; message: string }>;
   }> => {
-    // Get seminar request details using runQuery
-    const seminarRequest = await ctx.runQuery(getSeminarRequestById, { id: args.seminarRequestId });
+    // Use public query from seminar_requests module
+    const seminarRequest = await ctx.runQuery(api.seminar_requests.get, {
+      id: args.seminarRequestId,
+    });
+
     if (!seminarRequest) {
       throw new Error('Permohonan seminar tidak ditemukan');
     }
@@ -190,12 +192,14 @@ export const sendSeminarNotifications = action({
       throw new Error('Seminar belum dijadwalkan');
     }
 
-    // Get all lecturers involved
+    // Get all lecturers involved using public queries
     const lecturers = [];
 
     // Pembimbing Utama (Supervisor 1)
     if (seminarRequest.supervisor1Id) {
-      const supervisor1 = await ctx.runQuery(getLecturerById, { id: seminarRequest.supervisor1Id });
+      const supervisor1 = await ctx.runQuery(api.lecturers.get, {
+        id: seminarRequest.supervisor1Id,
+      });
       if (supervisor1) {
         lecturers.push({
           name: supervisor1.name,
@@ -207,7 +211,9 @@ export const sendSeminarNotifications = action({
 
     // Pembimbing Pendamping (Supervisor 2)
     if (seminarRequest.supervisor2Id) {
-      const supervisor2 = await ctx.runQuery(getLecturerById, { id: seminarRequest.supervisor2Id });
+      const supervisor2 = await ctx.runQuery(api.lecturers.get, {
+        id: seminarRequest.supervisor2Id,
+      });
       if (supervisor2) {
         lecturers.push({
           name: supervisor2.name,
@@ -219,7 +225,9 @@ export const sendSeminarNotifications = action({
 
     // Penguji 1 (Examiner 1)
     if (seminarRequest.examiner1Id) {
-      const examiner1 = await ctx.runQuery(getLecturerById, { id: seminarRequest.examiner1Id });
+      const examiner1 = await ctx.runQuery(api.lecturers.get, {
+        id: seminarRequest.examiner1Id,
+      });
       if (examiner1) {
         lecturers.push({
           name: examiner1.name,
@@ -231,7 +239,9 @@ export const sendSeminarNotifications = action({
 
     // Penguji 2 (Examiner 2)
     if (seminarRequest.examiner2Id) {
-      const examiner2 = await ctx.runQuery(getLecturerById, { id: seminarRequest.examiner2Id });
+      const examiner2 = await ctx.runQuery(api.lecturers.get, {
+        id: seminarRequest.examiner2Id,
+      });
       if (examiner2) {
         lecturers.push({
           name: examiner2.name,

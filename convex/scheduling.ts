@@ -250,7 +250,7 @@ export const getAvailableSlots = query({
     }
 
     // Get all 4 lecturers involved
-    const lecturerIds: string[] = [
+    const lecturerIds = [
       seminarRequest.supervisor1Id,
     ];
 
@@ -529,7 +529,7 @@ export const checkSlotAvailability = query({
     const endMinutes = timeToMinutes(args.endTime);
 
     // Get all lecturers
-    const lecturerIds: string[] = [
+    const lecturerIds = [
       seminarRequest.supervisor1Id,
     ];
     if (seminarRequest.supervisor2Id) lecturerIds.push(seminarRequest.supervisor2Id);

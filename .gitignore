@@ -36,3 +36,6 @@ next-env.d.ts
 
 # convex
 .convex/
+
+.vercel
+.env*.local
