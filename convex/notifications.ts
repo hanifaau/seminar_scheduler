@@ -1,5 +1,7 @@
 import { action } from './_generated/server';
 import { v } from 'convex/values';
+import { getSeminarRequestById } from './seminar_requests';
+import { getLecturerById } from './lecturers';
 
 // Types for notification payload
 interface NotificationPayload {
@@ -178,8 +180,8 @@ export const sendSeminarNotifications = action({
     success: boolean;
     results: Array<{ lecturer: string; role: string; success: boolean; message: string }>;
   }> => {
-    // Get seminar request details
-    const seminarRequest = await ctx.db.get(args.seminarRequestId);
+    // Get seminar request details using runQuery
+    const seminarRequest = await ctx.runQuery(getSeminarRequestById, { id: args.seminarRequestId });
     if (!seminarRequest) {
       throw new Error('Permohonan seminar tidak ditemukan');
     }
@@ -193,7 +195,7 @@ export const sendSeminarNotifications = action({
 
     // Pembimbing Utama (Supervisor 1)
     if (seminarRequest.supervisor1Id) {
-      const supervisor1 = await ctx.db.get(seminarRequest.supervisor1Id);
+      const supervisor1 = await ctx.runQuery(getLecturerById, { id: seminarRequest.supervisor1Id });
       if (supervisor1) {
         lecturers.push({
           name: supervisor1.name,
@@ -205,7 +207,7 @@ export const sendSeminarNotifications = action({
 
     // Pembimbing Pendamping (Supervisor 2)
     if (seminarRequest.supervisor2Id) {
-      const supervisor2 = await ctx.db.get(seminarRequest.supervisor2Id);
+      const supervisor2 = await ctx.runQuery(getLecturerById, { id: seminarRequest.supervisor2Id });
       if (supervisor2) {
         lecturers.push({
           name: supervisor2.name,
@@ -217,7 +219,7 @@ export const sendSeminarNotifications = action({
 
     // Penguji 1 (Examiner 1)
     if (seminarRequest.examiner1Id) {
-      const examiner1 = await ctx.db.get(seminarRequest.examiner1Id);
+      const examiner1 = await ctx.runQuery(getLecturerById, { id: seminarRequest.examiner1Id });
       if (examiner1) {
         lecturers.push({
           name: examiner1.name,
@@ -229,7 +231,7 @@ export const sendSeminarNotifications = action({
 
     // Penguji 2 (Examiner 2)
     if (seminarRequest.examiner2Id) {
-      const examiner2 = await ctx.db.get(seminarRequest.examiner2Id);
+      const examiner2 = await ctx.runQuery(getLecturerById, { id: seminarRequest.examiner2Id });
       if (examiner2) {
         lecturers.push({
           name: examiner2.name,
@@ -253,26 +255,82 @@ export const sendSeminarNotifications = action({
 
     const results: Array<{ lecturer: string; role: string; success: boolean; message: string }> = [];
 
+    // Get WhatsApp API configuration from environment variables
+    const whatsappApiUrl = process.env.WHATSAPP_API_URL;
+    const whatsappApiKey = process.env.WHATSAPP_API_KEY;
+    const apiConfigured = !!(whatsappApiUrl && whatsappApiKey);
+
     // Send notification to each lecturer
     for (const lecturer of lecturers) {
-      const result = await sendWhatsAppNotification.handler(ctx, {
+      if (!apiConfigured || !lecturer.phone) {
+        // Log or skip if API not configured or no phone
+        results.push({
+          lecturer: lecturer.name,
+          role: lecturer.role,
+          success: !apiConfigured,
+          message: !apiConfigured ? 'Notifikasi dicatat (API tidak dikonfigurasi)' : `Nomor telepon tidak tersedia untuk ${lecturer.name}`,
+        });
+        continue;
+      }
+
+      // Build message
+      const message = buildWhatsAppMessage({
         lecturerName: lecturer.name,
         lecturerRole: lecturer.role,
-        lecturerPhone: lecturer.phone,
         studentName: seminarRequest.studentName,
         nim: seminarRequest.nim,
         seminarType: seminarTypeMap[seminarRequest.type] || seminarRequest.type,
         date: seminarRequest.scheduledDate || '',
         time: timeRange,
-        room: seminarRequest.scheduledRoom,
+        room: seminarRequest.scheduledRoom || 'Belum ditentukan',
       });
 
-      results.push({
-        lecturer: lecturer.name,
-        role: lecturer.role,
-        success: result.success,
-        message: result.message,
-      });
+      try {
+        // Format phone number
+        let phone = lecturer.phone.replace(/\D/g, '');
+        if (phone.startsWith('0')) {
+          phone = '62' + phone.substring(1);
+        } else if (!phone.startsWith('62')) {
+          phone = '62' + phone;
+        }
+
+        const endpoint = `${whatsappApiUrl}/messages/text`;
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${whatsappApiKey}`,
+          },
+          body: JSON.stringify({
+            to: phone,
+            body: message,
+          }),
+        });
+
+        if (response.ok) {
+          results.push({
+            lecturer: lecturer.name,
+            role: lecturer.role,
+            success: true,
+            message: `Berhasil mengirim ke ${lecturer.name}`,
+          });
+        } else {
+          results.push({
+            lecturer: lecturer.name,
+            role: lecturer.role,
+            success: false,
+            message: `Gagal mengirim ke ${lecturer.name}: ${response.status}`,
+          });
+        }
+      } catch (error: any) {
+        results.push({
+          lecturer: lecturer.name,
+          role: lecturer.role,
+          success: false,
+          message: `Error mengirim ke ${lecturer.name}: ${error.message}`,
+        });
+      }
     }
 
     const allSuccess = results.every((r) => r.success);

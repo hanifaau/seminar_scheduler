@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(git remote add:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "mcp__5c39531f-4e03-4ab4-8c83-c64941ee2420__list_teams",
+      "mcp__5c39531f-4e03-4ab4-8c83-c64941ee2420__deploy_to_vercel",
+      "Bash(npx vercel deploy:*)",
+      "Bash(grep:*)"
     ]
   }
 }

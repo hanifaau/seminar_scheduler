@@ -9,6 +9,9 @@ export const get = query({
   },
 });
 
+// Alias for get function (used in notifications.ts)
+export const getSeminarRequestById = get;
+
 // Get all seminar requests
 export const getAll = query({
   args: {},
