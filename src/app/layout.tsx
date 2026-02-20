@@ -15,9 +15,6 @@ export const metadata: Metadata = {
   },
 };
 
-// Force dynamic rendering to avoid build-time Convex client issues
-export const dynamic = 'force-dynamic';
-
 export default function RootLayout({
   children,
 }: {
