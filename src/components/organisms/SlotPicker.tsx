@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Calendar, Clock, CheckCircle2, AlertTriangle, ChevronRight, Loader2, User } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, Loader2, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/atoms/Button';
 import { Badge } from '@/components/atoms/Badge';
@@ -29,6 +29,7 @@ interface SlotPickerProps {
   selectedSlot: TimeSlot | null;
   onSelectSlot: (slot: TimeSlot) => void;
   onCheckNextWeek?: () => void;
+  onCheckPrevWeek?: () => void;
   isLoading?: boolean;
   requiredDuration: number;
   alternativeDuration?: number;
@@ -59,6 +60,7 @@ export function SlotPicker({
   selectedSlot,
   onSelectSlot,
   onCheckNextWeek,
+  onCheckPrevWeek,
   isLoading = false,
   requiredDuration,
   alternativeDuration,
@@ -111,12 +113,20 @@ export function SlotPicker({
             Tidak ditemukan slot waktu yang cocok untuk minggu ini
           </p>
         </div>
-        {onCheckNextWeek && (
-          <Button variant="outline" onClick={onCheckNextWeek}>
-            <ChevronRight className="h-4 w-4 mr-2" />
-            Cek Minggu Berikutnya
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {onCheckPrevWeek && (
+            <Button variant="outline" onClick={onCheckPrevWeek}>
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Minggu Sebelumnya
+            </Button>
+          )}
+          {onCheckNextWeek && (
+            <Button variant="outline" onClick={onCheckNextWeek}>
+              Cek Minggu Berikutnya
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -275,13 +285,20 @@ export function SlotPicker({
         </div>
       )}
 
-      {/* Check Next Week Button */}
-      {onCheckNextWeek && (
-        <div className="flex justify-center pt-4 border-t">
-          <Button variant="outline" onClick={onCheckNextWeek}>
-            <ChevronRight className="h-4 w-4 mr-2" />
-            Cek Minggu Berikutnya
-          </Button>
+      {(onCheckNextWeek || onCheckPrevWeek) && (
+        <div className="flex justify-center gap-4 pt-4 border-t">
+          {onCheckPrevWeek && (
+            <Button variant="outline" onClick={onCheckPrevWeek}>
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Minggu Sebelumnya
+            </Button>
+          )}
+          {onCheckNextWeek && (
+            <Button variant="outline" onClick={onCheckNextWeek}>
+              Cek Minggu Berikutnya
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          )}
         </div>
       )}
     </div>
