@@ -135,14 +135,14 @@ function findFreeWindows(
   const merged: LecturerBusySlot[] = [];
   for (const slot of sorted) {
     if (merged.length === 0) {
-      merged.push(slot);
+      merged.push({ ...slot });
     } else {
       const last = merged[merged.length - 1];
       if (slot.startTime <= last.endTime) {
         // Overlapping, merge
         last.endTime = Math.max(last.endTime, slot.endTime);
       } else {
-        merged.push(slot);
+        merged.push({ ...slot });
       }
     }
   }
@@ -210,27 +210,29 @@ function intersectFreeWindows(
   return result.sort((a, b) => a.start - b.start);
 }
 
-// Generate date strings for the next N weeks starting from a given date
-function generateWeekDates(startDate: Date, weeksAhead: number = 2): Array<{ date: string; day: string }> {
+// Generate date strings for a specific week offset from a given date
+function generateWeekDates(startDate: Date, weekOffset: number = 0): Array<{ date: string; day: string }> {
   const dates: Array<{ date: string; day: string }> = [];
   const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
-  // Start from the next Monday if today is weekend
+  // Start calculating from the provided date
   let currentDate = new Date(startDate);
 
-  for (let week = 0; week < weeksAhead; week++) {
-    for (let i = 0; i < 7; i++) {
-      const dayOfWeek = currentDate.getDay();
-      // Skip weekends (0 = Sunday, 6 = Saturday)
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        const dateString = currentDate.toISOString().split('T')[0];
-        dates.push({
-          date: dateString,
-          day: dayNames[dayOfWeek],
-        });
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
+  // Advance by weekOffset weeks
+  currentDate.setDate(currentDate.getDate() + (weekOffset * 7));
+
+  // Generate for 1 week
+  for (let i = 0; i < 7; i++) {
+    const dayOfWeek = currentDate.getDay();
+    // Skip weekends (0 = Sunday, 6 = Saturday)
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      const dateString = currentDate.toISOString().split('T')[0];
+      dates.push({
+        date: dateString,
+        day: dayNames[dayOfWeek],
+      });
     }
+    currentDate.setDate(currentDate.getDate() + 1);
   }
 
   return dates;
@@ -240,7 +242,8 @@ function generateWeekDates(startDate: Date, weeksAhead: number = 2): Array<{ dat
 export const getAvailableSlots = query({
   args: {
     seminarRequestId: v.id('seminar_requests'),
-    weeksAhead: v.optional(v.number()), // How many weeks to search ahead (default 2)
+    weekOffset: v.optional(v.number()), // Which week to view (0 = this week)
+    weeksAhead: v.optional(v.number()), // For backwards compatibility with clients that haven't refreshed
   },
   handler: async (ctx, args) => {
     // Get the seminar request
@@ -279,9 +282,9 @@ export const getAvailableSlots = query({
     const requiredDuration = DURATION_REQUIREMENTS[seminarRequest.type] || 60;
     const alternativeDuration = requiredDuration - 10; // Secondary search duration
 
-    // Generate dates for the next N weeks
-    const weeksAhead = args.weeksAhead || 2;
-    const weekDates = generateWeekDates(new Date(), weeksAhead);
+    // Generate dates for the targeted week
+    const weekOffset = args.weekOffset || 0;
+    const weekDates = generateWeekDates(new Date(), weekOffset);
 
     const idealSlots: TimeSlot[] = [];
     const alternativeSlots: TimeSlot[] = [];
@@ -366,10 +369,20 @@ export const getAvailableSlots = query({
     idealSlots.sort(sortByDateAndTime);
     alternativeSlots.sort(sortByDateAndTime);
 
+    // Deduplicate slots using unique key
+    const uniqueMap = (slots: TimeSlot[]) => {
+      const map = new Map<string, TimeSlot>();
+      slots.forEach(slot => map.set(`${slot.date}-${slot.startTime}`, slot));
+      return Array.from(map.values());
+    };
+
+    const uniqueIdealSlots = uniqueMap(idealSlots);
+    const uniqueAlternativeSlots = uniqueMap(alternativeSlots);
+
     // Limit to max recommendations
-    const limitedIdealSlots = idealSlots.slice(0, MAX_RECOMMENDATIONS);
+    const limitedIdealSlots = uniqueIdealSlots.slice(0, MAX_RECOMMENDATIONS);
     const remainingSlots = MAX_RECOMMENDATIONS - limitedIdealSlots.length;
-    const limitedAlternativeSlots = alternativeSlots.slice(0, remainingSlots);
+    const limitedAlternativeSlots = uniqueAlternativeSlots.slice(0, remainingSlots);
 
     // Return combined results with ideal slots first
     return {
@@ -388,8 +401,8 @@ export const getAvailableSlots = query({
       alternativeDuration,
       idealSlots: limitedIdealSlots,
       alternativeSlots: limitedAlternativeSlots,
-      totalIdealSlots: idealSlots.length,
-      totalAlternativeSlots: alternativeSlots.length,
+      totalIdealSlots: uniqueIdealSlots.length,
+      totalAlternativeSlots: uniqueAlternativeSlots.length,
       showingSlots: limitedIdealSlots.length + limitedAlternativeSlots.length,
     };
   },
