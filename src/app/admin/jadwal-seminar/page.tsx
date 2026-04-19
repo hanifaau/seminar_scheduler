@@ -90,7 +90,7 @@ export default function JadwalSeminarPage() {
   const [selectedSlot, setSelectedSlot] = React.useState<TimeSlot | null>(null);
   const [room, setRoom] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [weeksAhead, setWeeksAhead] = React.useState(2);
+  const [weekOffset, setWeekOffset] = React.useState(0);
 
   // WhatsApp notification states
   const [sendNotification, setSendNotification] = React.useState(false);
@@ -102,7 +102,7 @@ export default function JadwalSeminarPage() {
   const availableSlots = useQuery(
     api.scheduling.getAvailableSlots,
     selectedRequest
-      ? { seminarRequestId: selectedRequest._id as any, weeksAhead }
+      ? { seminarRequestId: selectedRequest._id as any, weekOffset }
       : 'skip'
   );
 
@@ -124,7 +124,11 @@ export default function JadwalSeminarPage() {
   };
 
   const handleCheckNextWeek = () => {
-    setWeeksAhead((prev) => prev + 1);
+    setWeekOffset((prev) => prev + 1);
+  };
+
+  const handleCheckPrevWeek = () => {
+    setWeekOffset((prev) => Math.max(0, prev - 1));
   };
 
   const handleSchedule = async () => {
@@ -178,7 +182,7 @@ export default function JadwalSeminarPage() {
         setSelectedRequest(null);
         setSelectedSlot(null);
         setRoom('');
-        setWeeksAhead(2);
+        setWeekOffset(0);
         setSendNotification(false);
       }
     } catch (error: any) {
@@ -192,7 +196,7 @@ export default function JadwalSeminarPage() {
     setSelectedRequest(null);
     setSelectedSlot(null);
     setRoom('');
-    setWeeksAhead(2);
+    setWeekOffset(0);
     setSendNotification(false);
     setNotificationResults(null);
   };
@@ -355,6 +359,7 @@ export default function JadwalSeminarPage() {
                     selectedSlot={selectedSlot}
                     onSelectSlot={handleSelectSlot}
                     onCheckNextWeek={handleCheckNextWeek}
+                    onCheckPrevWeek={weekOffset > 0 ? handleCheckPrevWeek : undefined}
                     requiredDuration={availableSlots.requiredDuration}
                     alternativeDuration={availableSlots.alternativeDuration}
                   />
