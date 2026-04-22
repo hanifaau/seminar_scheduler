@@ -34,9 +34,9 @@ const MAX_RECOMMENDATIONS = 10; // Maximum slots to return
 
 // Duration requirements by seminar type (in minutes)
 const DURATION_REQUIREMENTS: Record<string, number> = {
-  Proposal: 60,
+  Proposal: 90,
   Hasil: 90,
-  Sidang: 90,
+  Sidang: 120,
 };
 
 // Days of the week (Indonesian)
