@@ -321,7 +321,6 @@ export default function PermohonanSeminarPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleEdit(request)}
-                            disabled={request.status !== 'requested'}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -330,7 +329,6 @@ export default function PermohonanSeminarPage() {
                             size="icon"
                             onClick={() => handleDelete(request)}
                             className="text-destructive hover:text-destructive"
-                            disabled={request.status !== 'requested'}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
