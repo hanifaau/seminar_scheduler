@@ -14,10 +14,11 @@ interface NotificationPayload {
   room: string;
 }
 
-// Whapi.cloud API Configuration
+// Twilio API Configuration
 // Add these environment variables in Convex Dashboard:
-// - WHATSAPP_API_URL: https://gate.whapi.cloud
-// - WHATSAPP_API_KEY: your_api_token
+// - TWILIO_ACCOUNT_SID: your_account_sid
+// - TWILIO_AUTH_TOKEN: your_auth_token
+// - TWILIO_WHATSAPP_NUMBER: your_twilio_whatsapp_number (e.g. +14155238886)
 
 // Format date to Indonesian format
 function formatDateIndonesian(dateString: string): string {
@@ -55,7 +56,52 @@ Mohon kehadiran Bapak/Ibu tepat waktu. Terima kasih.
 Pesan ini dikirim otomatis oleh Sistem Penjadwalan Seminar TI Unand.`;
 }
 
-// Send WhatsApp notification to a single lecturer using Whapi.cloud API
+// Helper to send Twilio message
+async function sendTwilioMessage(toPhone: string, messageBody: string) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+
+  if (!accountSid || !authToken || !fromNumber) {
+    throw new Error('TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, atau TWILIO_WHATSAPP_NUMBER belum diatur di Convex Dashboard');
+  }
+
+  // Format phone number for Twilio WhatsApp
+  let phone = toPhone.replace(/\D/g, '');
+  if (phone.startsWith('0')) {
+    phone = '62' + phone.substring(1);
+  } else if (!phone.startsWith('62')) {
+    phone = '62' + phone;
+  }
+  const toWhatsApp = `whatsapp:+${phone}`;
+  const fromWhatsApp = `whatsapp:${fromNumber.startsWith('+') ? fromNumber : '+' + fromNumber}`;
+
+  const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+
+  const body = new URLSearchParams({
+    To: toWhatsApp,
+    From: fromWhatsApp,
+    Body: messageBody,
+  });
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+    },
+    body: body.toString(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Twilio API Error ${response.status}: ${errorText}`);
+  }
+
+  return response.json();
+}
+
+// Send WhatsApp notification to a single lecturer using Twilio API
 export const sendWhatsAppNotification = action({
   args: {
     lecturerName: v.string(),
@@ -69,33 +115,16 @@ export const sendWhatsAppNotification = action({
     room: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ success: boolean; message: string }> => {
-    // Get WhatsApp API configuration from Convex environment variables
-    // Set these in Convex Dashboard > Settings > Environment Variables
-    const whatsappApiUrl = process.env.WHATSAPP_API_URL; // e.g., "https://gate.whapi.cloud"
-    const whatsappApiKey = process.env.WHATSAPP_API_KEY; // your API token
+    const apiConfigured = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_NUMBER);
 
-    // Validate environment variables
-    if (!whatsappApiUrl || !whatsappApiKey) {
-      console.log('[WhatsApp] Environment variables not configured. Logging message instead.');
-      console.log('[WhatsApp] Set WHATSAPP_API_URL and WHATSAPP_API_KEY in Convex Dashboard');
-      const message = buildWhatsAppMessage({
-        lecturerName: args.lecturerName,
-        lecturerRole: args.lecturerRole,
-        studentName: args.studentName,
-        nim: args.nim,
-        seminarType: args.seminarType,
-        date: args.date,
-        time: args.time,
-        room: args.room || 'Belum ditentukan',
-      });
-      console.log('[WhatsApp] Message would be sent:', message);
+    if (!apiConfigured) {
+      console.log('[Twilio] Environment variables not configured. Logging message instead.');
       return {
         success: true,
-        message: 'Notifikasi dicatat (API tidak dikonfigurasi)',
+        message: 'Notifikasi dicatat (API Twilio tidak dikonfigurasi)',
       };
     }
 
-    // Validate phone number
     if (!args.lecturerPhone) {
       return {
         success: false,
@@ -103,7 +132,6 @@ export const sendWhatsAppNotification = action({
       };
     }
 
-    // Build the message
     const message = buildWhatsAppMessage({
       lecturerName: args.lecturerName,
       lecturerRole: args.lecturerRole,
@@ -116,52 +144,15 @@ export const sendWhatsAppNotification = action({
     });
 
     try {
-      // Format phone number for Whapi.cloud
-      // Remove non-digits, ensure it starts with country code
-      let phone = args.lecturerPhone.replace(/\D/g, '');
-      if (phone.startsWith('0')) {
-        phone = '62' + phone.substring(1);
-      } else if (!phone.startsWith('62')) {
-        phone = '62' + phone;
-      }
-
-      // Whapi.cloud API endpoint for sending text messages
-      const endpoint = `${whatsappApiUrl}/messages/text`;
-
-      console.log(`[WhatsApp] Sending to ${args.lecturerName} at ${phone}`);
-
-      // Send to Whapi.cloud API
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${whatsappApiKey}`,
-        },
-        body: JSON.stringify({
-          to: phone,
-          body: message,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[WhatsApp] API Error:', response.status, errorText);
-        return {
-          success: false,
-          message: `Gagal mengirim ke ${args.lecturerName}: ${response.status}`,
-        };
-      }
-
-      const responseData = await response.json();
-      console.log('[WhatsApp] API Response:', JSON.stringify(responseData));
-      console.log(`[WhatsApp] Successfully sent notification to ${args.lecturerName}`);
-
+      console.log(`[Twilio] Sending to ${args.lecturerName} at ${args.lecturerPhone}`);
+      await sendTwilioMessage(args.lecturerPhone, message);
+      console.log(`[Twilio] Successfully sent notification to ${args.lecturerName}`);
       return {
         success: true,
         message: `Berhasil mengirim ke ${args.lecturerName}`,
       };
     } catch (error: any) {
-      console.error('[WhatsApp] Error sending notification:', error);
+      console.error('[Twilio] Error sending notification:', error);
       return {
         success: false,
         message: `Error mengirim ke ${args.lecturerName}: ${error.message}`,
@@ -179,7 +170,6 @@ export const sendSeminarNotifications = action({
     success: boolean;
     results: Array<{ lecturer: string; role: string; success: boolean; message: string }>;
   }> => {
-    // Use public query from seminar_requests module
     const seminarRequest = await ctx.runQuery(api.seminar_requests.get, {
       id: args.seminarRequestId,
     });
@@ -192,71 +182,29 @@ export const sendSeminarNotifications = action({
       throw new Error('Seminar belum dijadwalkan');
     }
 
-    // Get all lecturers involved using public queries
     const lecturers = [];
 
-    // Pembimbing Utama (Supervisor 1)
     if (seminarRequest.supervisor1Id) {
-      const supervisor1 = await ctx.runQuery(api.lecturers.get, {
-        id: seminarRequest.supervisor1Id,
-      });
-      if (supervisor1) {
-        lecturers.push({
-          name: supervisor1.name,
-          phone: supervisor1.phone,
-          role: 'Pembimbing Utama',
-        });
-      }
+      const supervisor1 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.supervisor1Id });
+      if (supervisor1) lecturers.push({ name: supervisor1.name, phone: supervisor1.phone, role: 'Pembimbing Utama' });
     }
-
-    // Pembimbing Pendamping (Supervisor 2)
     if (seminarRequest.supervisor2Id) {
-      const supervisor2 = await ctx.runQuery(api.lecturers.get, {
-        id: seminarRequest.supervisor2Id,
-      });
-      if (supervisor2) {
-        lecturers.push({
-          name: supervisor2.name,
-          phone: supervisor2.phone,
-          role: 'Pembimbing Pendamping',
-        });
-      }
+      const supervisor2 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.supervisor2Id });
+      if (supervisor2) lecturers.push({ name: supervisor2.name, phone: supervisor2.phone, role: 'Pembimbing Pendamping' });
     }
-
-    // Penguji 1 (Examiner 1)
     if (seminarRequest.examiner1Id) {
-      const examiner1 = await ctx.runQuery(api.lecturers.get, {
-        id: seminarRequest.examiner1Id,
-      });
-      if (examiner1) {
-        lecturers.push({
-          name: examiner1.name,
-          phone: examiner1.phone,
-          role: 'Penguji 1',
-        });
-      }
+      const examiner1 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.examiner1Id });
+      if (examiner1) lecturers.push({ name: examiner1.name, phone: examiner1.phone, role: 'Penguji 1' });
     }
-
-    // Penguji 2 (Examiner 2)
     if (seminarRequest.examiner2Id) {
-      const examiner2 = await ctx.runQuery(api.lecturers.get, {
-        id: seminarRequest.examiner2Id,
-      });
-      if (examiner2) {
-        lecturers.push({
-          name: examiner2.name,
-          phone: examiner2.phone,
-          role: 'Penguji 2',
-        });
-      }
+      const examiner2 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.examiner2Id });
+      if (examiner2) lecturers.push({ name: examiner2.name, phone: examiner2.phone, role: 'Penguji 2' });
     }
 
-    // Format time range
     const timeRange = seminarRequest.scheduledStartTime && seminarRequest.scheduledEndTime
       ? `${seminarRequest.scheduledStartTime} - ${seminarRequest.scheduledEndTime} WIB`
       : seminarRequest.scheduledTime || 'Waktu belum ditentukan';
 
-    // Seminar type mapping
     const seminarTypeMap: Record<string, string> = {
       Proposal: 'Seminar Proposal',
       Hasil: 'Seminar Hasil',
@@ -265,25 +213,19 @@ export const sendSeminarNotifications = action({
 
     const results: Array<{ lecturer: string; role: string; success: boolean; message: string }> = [];
 
-    // Get WhatsApp API configuration from environment variables
-    const whatsappApiUrl = process.env.WHATSAPP_API_URL;
-    const whatsappApiKey = process.env.WHATSAPP_API_KEY;
-    const apiConfigured = !!(whatsappApiUrl && whatsappApiKey);
+    const apiConfigured = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_NUMBER);
 
-    // Send notification to each lecturer
     for (const lecturer of lecturers) {
       if (!apiConfigured || !lecturer.phone) {
-        // Log or skip if API not configured or no phone
         results.push({
           lecturer: lecturer.name,
           role: lecturer.role,
           success: !apiConfigured,
-          message: !apiConfigured ? 'Notifikasi dicatat (API tidak dikonfigurasi)' : `Nomor telepon tidak tersedia untuk ${lecturer.name}`,
+          message: !apiConfigured ? 'Notifikasi dicatat (API Twilio tidak dikonfigurasi)' : `Nomor telepon tidak tersedia untuk ${lecturer.name}`,
         });
         continue;
       }
 
-      // Build message
       const message = buildWhatsAppMessage({
         lecturerName: lecturer.name,
         lecturerRole: lecturer.role,
@@ -296,43 +238,13 @@ export const sendSeminarNotifications = action({
       });
 
       try {
-        // Format phone number
-        let phone = lecturer.phone.replace(/\D/g, '');
-        if (phone.startsWith('0')) {
-          phone = '62' + phone.substring(1);
-        } else if (!phone.startsWith('62')) {
-          phone = '62' + phone;
-        }
-
-        const endpoint = `${whatsappApiUrl}/messages/text`;
-
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${whatsappApiKey}`,
-          },
-          body: JSON.stringify({
-            to: phone,
-            body: message,
-          }),
+        await sendTwilioMessage(lecturer.phone, message);
+        results.push({
+          lecturer: lecturer.name,
+          role: lecturer.role,
+          success: true,
+          message: `Berhasil mengirim ke ${lecturer.name}`,
         });
-
-        if (response.ok) {
-          results.push({
-            lecturer: lecturer.name,
-            role: lecturer.role,
-            success: true,
-            message: `Berhasil mengirim ke ${lecturer.name}`,
-          });
-        } else {
-          results.push({
-            lecturer: lecturer.name,
-            role: lecturer.role,
-            success: false,
-            message: `Gagal mengirim ke ${lecturer.name}: ${response.status}`,
-          });
-        }
       } catch (error: any) {
         results.push({
           lecturer: lecturer.name,
@@ -344,9 +256,7 @@ export const sendSeminarNotifications = action({
     }
 
     const allSuccess = results.every((r) => r.success);
-
-    console.log(`[WhatsApp] Notification batch complete. Success: ${allSuccess}`);
-    console.log('[WhatsApp] Results:', JSON.stringify(results, null, 2));
+    console.log(`[Twilio] Notification batch complete. Success: ${allSuccess}`);
 
     return {
       success: allSuccess,
