@@ -188,6 +188,8 @@ export const update = mutation({
     )),
     supervisor1Id: v.optional(v.id('lecturers')),
     supervisor2Id: v.optional(v.id('lecturers')),
+    examiner1Id: v.optional(v.id('lecturers')),
+    examiner2Id: v.optional(v.id('lecturers')),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -197,15 +199,42 @@ export const update = mutation({
       throw new Error('Permohonan seminar tidak ditemukan');
     }
 
-    const updateData: Record<string, unknown> = {
+    const updateData: Record<string, any> = {
       ...updates,
       updatedAt: Date.now(),
     };
 
-    // Remove undefined values
+    // Remove undefined values from updates (so we don't accidentally overwrite with undefined from frontend if not provided)
+    // Wait, if we want to delete examiner2Id, the frontend should send null or we handle it specially.
+    // For now, let's keep the frontend logic that sends undefined if not provided.
     Object.keys(updateData).forEach(
       (key) => updateData[key] === undefined && delete updateData[key]
     );
+
+    // Cek apakah ada perubahan penguji
+    const examiner1Changed = updateData.examiner1Id && updateData.examiner1Id !== existing.examiner1Id;
+    const examiner2Changed = (updateData.examiner2Id && updateData.examiner2Id !== existing.examiner2Id) || (updateData.examiner2Id === null && existing.examiner2Id !== undefined);
+
+    if (examiner1Changed || examiner2Changed) {
+      // Jika statusnya scheduled, batalkan jadwalnya karena dosen berubah
+      if (existing.status === 'scheduled') {
+        updateData.scheduledDate = undefined;
+        updateData.scheduledStartTime = undefined;
+        updateData.scheduledEndTime = undefined;
+        updateData.scheduledRoom = undefined;
+        updateData.status = 'allocated';
+      } else if (existing.status === 'requested') {
+        // Jika dari requested lalu diisi pengujinya, otomatis naik status
+        if (updateData.examiner1Id) {
+          updateData.status = 'allocated';
+        }
+      }
+    }
+
+    // Convert nulls back to undefined for Convex patch to delete fields
+    if (updateData.examiner2Id === null) {
+      updateData.examiner2Id = undefined;
+    }
 
     await ctx.db.patch(id, updateData);
     return id;

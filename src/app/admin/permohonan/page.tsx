@@ -65,6 +65,8 @@ export default function PermohonanSeminarPage() {
     type: 'Proposal' as 'Proposal' | 'Hasil' | 'Sidang',
     supervisor1Id: '',
     supervisor2Id: '',
+    examiner1Id: '',
+    examiner2Id: '',
     notes: '',
   });
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -119,6 +121,8 @@ export default function PermohonanSeminarPage() {
           type: formData.type,
           supervisor1Id: formData.supervisor1Id as any,
           supervisor2Id: formData.supervisor2Id as any || undefined,
+          examiner1Id: formData.examiner1Id as any || undefined,
+          examiner2Id: formData.examiner2Id as any || undefined,
           notes: formData.notes || undefined,
         });
         toast.success('Permohonan berhasil diperbarui');
@@ -162,6 +166,8 @@ export default function PermohonanSeminarPage() {
       type: request.type,
       supervisor1Id: request.supervisor1Id,
       supervisor2Id: request.supervisor2Id || '',
+      examiner1Id: request.examiner1Id || '',
+      examiner2Id: request.examiner2Id || '',
       notes: request.notes || '',
     });
     setIsDialogOpen(true);
@@ -187,6 +193,8 @@ export default function PermohonanSeminarPage() {
       type: 'Proposal',
       supervisor1Id: '',
       supervisor2Id: '',
+      examiner1Id: '',
+      examiner2Id: '',
       notes: '',
     });
     setIsDialogOpen(true);
@@ -451,7 +459,62 @@ export default function PermohonanSeminarPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              {editingRequest && (
+                <div className="pt-4 border-t space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-foreground">Seksi Penguji Sidang</h3>
+                  </div>
+                  {editingRequest.status === 'scheduled' && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 p-3 rounded-md text-sm text-yellow-800 dark:text-yellow-200">
+                      <strong>Perhatian:</strong> Jadwal saat ini sudah fix. Jika Anda mengubah nama Penguji di bawah ini, jadwal yang sudah ada akan dibatalkan secara otomatis dan Anda harus menjadwalkan ulang di halaman Penjadwalan.
+                    </div>
+                  )}
+                  <div>
+                    <Label htmlFor="examiner1">Penguji 1</Label>
+                    <Select
+                      value={formData.examiner1Id || "none"}
+                      onValueChange={(value) => setFormData({ ...formData, examiner1Id: value === "none" ? "" : value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih penguji 1 (opsional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Belum Ditentukan</SelectItem>
+                        {activeLecturers
+                          .filter(l => l._id !== formData.supervisor1Id && l._id !== formData.supervisor2Id)
+                          .map((lecturer) => (
+                            <SelectItem key={lecturer._id} value={lecturer._id}>
+                              {lecturer.name}
+                            </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="examiner2">Penguji 2</Label>
+                    <Select
+                      value={formData.examiner2Id || "none"}
+                      onValueChange={(value) => setFormData({ ...formData, examiner2Id: value === "none" ? "" : value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih penguji 2 (opsional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Belum Ditentukan</SelectItem>
+                        {activeLecturers
+                          .filter(l => l._id !== formData.supervisor1Id && l._id !== formData.supervisor2Id && l._id !== formData.examiner1Id)
+                          .map((lecturer) => (
+                            <SelectItem key={lecturer._id} value={lecturer._id}>
+                              {lecturer.name}
+                            </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+              <div className="pt-4 border-t">
                 <Label htmlFor="notes">Catatan (opsional)</Label>
                 <Input
                   id="notes"
