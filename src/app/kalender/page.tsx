@@ -41,23 +41,6 @@ function Skeleton({ className }: { className?: string }) {
   return <div className={cn('skeleton', className)} />;
 }
 
-interface ScheduleWithLecturer {
-  _id: string;
-  lecturerId: string;
-  day: string;
-  startTime: string;
-  endTime: string;
-  activity: string;
-  room?: string;
-  notes?: string;
-  lecturer?: {
-    _id: string;
-    name: string;
-    nip: string;
-    expertise: string[];
-  };
-}
-
 // Map day names to numbers (0 = Sunday)
 const DAY_MAP: Record<string, number> = {
   'minggu': 0, 'senin': 1, 'selasa': 2, 'rabu': 3,
@@ -97,29 +80,36 @@ export default function KalenderPage() {
   const [selectedWeek, setSelectedWeek] = React.useState<Date[]>(getWeekDates(new Date()));
 
   // Queries
-  const schedules = useQuery(api.teaching_schedules.getAllWithLecturer);
+  const schedules = useQuery(api.seminar_requests.getAllWithLecturers);
 
   // Get schedules for the selected week
   const weeklySchedules = React.useMemo(() => {
     if (!schedules || selectedWeek.length === 0) return [];
 
-    const weekDayNumbers = selectedWeek.map(d => d.getDay());
+    // Format week dates to YYYY-MM-DD to match scheduledDate
+    const weekDateStrings = selectedWeek.map(d => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    });
 
-    return (schedules as ScheduleWithLecturer[]).filter((schedule) => {
-      const dayNum = DAY_MAP[schedule.day.toLowerCase()];
-      return dayNum !== undefined && weekDayNumbers.includes(dayNum);
+    return schedules.filter((schedule) => {
+      return schedule.status === 'scheduled' && schedule.scheduledDate && weekDateStrings.includes(schedule.scheduledDate);
     });
   }, [schedules, selectedWeek]);
 
   // Group schedules by day
   const schedulesByDay = React.useMemo(() => {
-    const grouped: Record<number, ScheduleWithLecturer[]> = {};
+    const grouped: Record<number, any[]> = {};
     HARI_INDONESIA.forEach((_, i) => {
       grouped[i] = [];
     });
 
     weeklySchedules.forEach((schedule) => {
-      const dayNum = DAY_MAP[schedule.day.toLowerCase()];
+      if (!schedule.scheduledDate) return;
+      const d = new Date(schedule.scheduledDate);
+      const dayNum = d.getDay(); // 0 is Sunday, 1 is Monday...
       if (dayNum !== undefined) {
         if (!grouped[dayNum]) grouped[dayNum] = [];
         grouped[dayNum].push(schedule);
@@ -129,7 +119,7 @@ export default function KalenderPage() {
     // Sort each day's schedules by time
     Object.keys(grouped).forEach((key) => {
       grouped[parseInt(key)].sort((a, b) =>
-        a.startTime.localeCompare(b.startTime)
+        (a.scheduledStartTime || '').localeCompare(b.scheduledStartTime || '')
       );
     });
 
@@ -265,36 +255,35 @@ export default function KalenderPage() {
                         {daySchedules.map((schedule) => (
                           <div
                             key={schedule._id}
-                            className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                            className="flex flex-col gap-2 p-3 bg-muted/30 rounded-lg border hover:bg-muted/50 transition-colors"
                           >
-                            <div className="flex-shrink-0 text-center">
-                              <Clock className="h-4 w-4 text-primary mx-auto" />
-                              <p className="text-xs font-medium text-foreground mt-1">
-                                {schedule.startTime}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {schedule.endTime}
-                              </p>
+                            <div className="flex justify-between items-start">
+                               <div className="flex items-center gap-2 text-primary font-medium text-sm">
+                                  <Clock className="h-4 w-4" />
+                                  {schedule.scheduledStartTime} - {schedule.scheduledEndTime}
+                               </div>
+                               <Badge variant="outline">{schedule.type}</Badge>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-foreground truncate">
-                                {schedule.activity}
-                              </p>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                                <User className="h-3 w-3" />
-                                <span>{schedule.lecturer?.name || 'Tidak Diketahui'}</span>
-                              </div>
-                              {schedule.room && (
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  Ruang: {schedule.room}
-                                </p>
-                              )}
+                            
+                            <div>
+                               <p className="font-semibold text-foreground text-sm">{schedule.studentName} <span className="text-muted-foreground font-normal">({schedule.nim})</span></p>
+                               <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{schedule.title}</p>
                             </div>
-                            {schedule.notes && (
-                              <Badge variant="outline" className="text-xs flex-shrink-0">
-                                Catatan
-                              </Badge>
-                            )}
+
+                            <div className="flex flex-col gap-1 mt-1 pt-2 border-t text-xs text-foreground">
+                               <div className="flex gap-2 items-start">
+                                 <span className="w-20 font-medium text-muted-foreground">Ruang:</span>
+                                 <span>{schedule.scheduledRoom || 'Belum ditentukan'}</span>
+                               </div>
+                               <div className="flex gap-2 items-start">
+                                 <span className="w-20 font-medium text-muted-foreground">Pembimbing:</span>
+                                 <span>{schedule.supervisor1?.name} {schedule.supervisor2 ? `, ${schedule.supervisor2.name}` : ''}</span>
+                               </div>
+                               <div className="flex gap-2 items-start">
+                                 <span className="w-20 font-medium text-muted-foreground">Penguji:</span>
+                                 <span>{schedule.examiner1?.name || '-'} {schedule.examiner2 ? `, ${schedule.examiner2.name}` : ''}</span>
+                               </div>
+                            </div>
                           </div>
                         ))}
                       </div>
