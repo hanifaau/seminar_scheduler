@@ -126,6 +126,17 @@ export const remove = mutation({
     if (!existing) {
       throw new Error('Lecturer not found');
     }
+
+    // CASCADING DELETE: Hapus semua jadwal mengajar yang dimiliki dosen ini
+    const schedules = await ctx.db
+      .query('teaching_schedules')
+      .withIndex('by_lecturer', (q) => q.eq('lecturerId', args.id))
+      .collect();
+
+    for (const schedule of schedules) {
+      await ctx.db.delete(schedule._id);
+    }
+
     await ctx.db.delete(args.id);
     return args.id;
   },

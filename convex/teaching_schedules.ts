@@ -511,3 +511,23 @@ export const importCourseSchedule = mutation({
     };
   },
 });
+
+// Cleanup orphaned schedules (where lecturer no longer exists)
+export const cleanupOrphanedSchedules = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const schedules = await ctx.db.query('teaching_schedules').collect();
+    let deletedCount = 0;
+
+    for (const schedule of schedules) {
+      const lecturer = await ctx.db.get(schedule.lecturerId);
+      // Jika dosen tidak ada (null), berarti jadwal ini orphaned data
+      if (!lecturer) {
+        await ctx.db.delete(schedule._id);
+        deletedCount++;
+      }
+    }
+
+    return { deletedCount, message: `Berhasil membersihkan ${deletedCount} jadwal mengajar yatim piatu.` };
+  },
+});
