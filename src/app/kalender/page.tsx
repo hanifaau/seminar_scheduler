@@ -90,6 +90,7 @@ export default function KalenderPage() {
 
   // Queries
   const schedules = useQuery(api.seminar_requests.getAllWithLecturers);
+  const teachingSchedules = useQuery(api.teaching_schedules.getAllWithLecturer);
 
   // Extract all dates that have schedules to highlight in calendar
   const datesWithSchedules = React.useMemo(() => {
@@ -120,6 +121,21 @@ export default function KalenderPage() {
     return filtered;
   }, [schedules, selectedDate]);
 
+  // Get teaching schedules for the selected day of week
+  const dailyTeachingSchedules = React.useMemo(() => {
+    if (!teachingSchedules || !selectedDate) return [];
+
+    const dayNames = ['minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
+    const selectedDayName = dayNames[selectedDate.getDay()];
+
+    const filtered = teachingSchedules.filter((schedule) => {
+      return schedule.day.toLowerCase() === selectedDayName;
+    });
+
+    filtered.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+    return filtered;
+  }, [teachingSchedules, selectedDate]);
+
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
@@ -134,7 +150,7 @@ export default function KalenderPage() {
     setCurrentMonth(newDate);
   };
 
-  const isLoading = schedules === undefined;
+  const isLoading = schedules === undefined || teachingSchedules === undefined;
 
   // Format day header
   const dayHeader = React.useMemo(() => {
@@ -205,16 +221,82 @@ export default function KalenderPage() {
 
           {/* Schedule Cards */}
           {isLoading ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="rounded-lg border p-4">
-                  <Skeleton className="h-5 w-24 mb-3" />
-                  <Skeleton className="h-16 w-full" />
-                </div>
-              ))}
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={`loading-left-${i}`} className="rounded-lg border p-4">
+                    <Skeleton className="h-5 w-24 mb-3" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={`loading-right-${i}`} className="rounded-lg border p-4">
+                    <Skeleton className="h-5 w-24 mb-3" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid gap-6 md:grid-cols-2 items-start">
+                  {/* Teaching Schedules Block (Zona Kiri) */}
+                  <div className="rounded-lg border p-4 border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-amber-900 dark:text-amber-500">
+                          Jadwal Mengajar Reguler
+                        </h3>
+                      </div>
+                    </div>
+
+                    {dailyTeachingSchedules.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-2">
+                        Tidak ada jadwal mata kuliah pada hari ini
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {dailyTeachingSchedules.map((schedule) => (
+                          <div
+                            key={schedule._id}
+                            className="flex flex-col gap-2 p-3 bg-card rounded-lg border border-amber-200 dark:border-amber-900/50 hover:shadow-sm transition-colors"
+                          >
+                            <div className="flex justify-between items-start">
+                               <div className="flex items-center gap-2 text-amber-600 font-medium text-sm">
+                                  <Clock className="h-4 w-4" />
+                                  {schedule.startTime} - {schedule.endTime}
+                               </div>
+                               {schedule.course && (
+                                 <Badge variant="outline" className="text-amber-700 border-amber-300">
+                                   {schedule.course.sks} SKS
+                                 </Badge>
+                               )}
+                            </div>
+                            
+                            <div>
+                               <p className="font-semibold text-foreground text-sm">{schedule.activity}</p>
+                               <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                                 <User className="h-3 w-3" />
+                                 <span>{schedule.lecturer?.name || 'Tidak Diketahui'}</span>
+                               </div>
+                            </div>
+
+                            {schedule.room && (
+                              <div className="flex flex-col gap-1 mt-1 pt-2 border-t border-amber-100 dark:border-amber-900/30 text-xs text-foreground">
+                                 <div className="flex gap-2 items-start">
+                                   <span className="w-16 font-medium text-muted-foreground">Ruang:</span>
+                                   <span>{schedule.room}</span>
+                                 </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Jadwal Sidang Block (Zona Kanan) */}
                   <div className="rounded-lg border p-4 border-primary bg-primary/5">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
