@@ -465,14 +465,9 @@ export default function ManajemenDosenPage() {
                 <Label htmlFor="phone">No. WhatsApp (opsional)</Label>
                 <Input
                   id="phone"
-                  type="tel"
+                  type="text"
                   value={formData.phone}
-                  onChange={(e) => {
-                    // Sanitasi: Hapus semua karakter kecuali angka dan simbol plus (+)
-                    // Ini penting untuk membuang karakter 'invisible' hasil copy-paste dari WhatsApp
-                    const sanitized = e.target.value.replace(/[^\d+]/g, '');
-                    setFormData({ ...formData, phone: sanitized });
-                  }}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="contoh: 08123456789"
                 />
               </div>
@@ -538,12 +533,9 @@ export default function ManajemenDosenPage() {
                 <Label htmlFor="edit-phone">No. WhatsApp</Label>
                 <Input
                   id="edit-phone"
-                  type="tel"
+                  type="text"
                   value={formData.phone}
-                  onChange={(e) => {
-                    const sanitized = e.target.value.replace(/[^\d+]/g, '');
-                    setFormData({ ...formData, phone: sanitized });
-                  }}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="contoh: 08123456789"
                 />
               </div>
