@@ -132,6 +132,31 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    
+    // Cari riwayat permohonan masa lalu berdasarkan NIM
+    const historicalRequests = await ctx.db
+      .query('seminar_requests')
+      .withIndex('by_nim', (q) => q.eq('nim', args.nim))
+      .order('desc')
+      .collect();
+
+    // Temukan riwayat pertama yang sudah punya penguji
+    const pastRequestWithExaminers = historicalRequests.find(
+      (req) => req.examiner1Id !== undefined
+    );
+
+    // Default: belum dialokasikan
+    let finalStatus = 'requested';
+    let examiner1Id = undefined;
+    let examiner2Id = undefined;
+
+    // Jika ditemukan, copy pengujinya dan otomatis ubah status
+    if (pastRequestWithExaminers) {
+      examiner1Id = pastRequestWithExaminers.examiner1Id;
+      examiner2Id = pastRequestWithExaminers.examiner2Id;
+      finalStatus = 'allocated';
+    }
+
     const requestId = await ctx.db.insert('seminar_requests', {
       studentName: args.studentName,
       nim: args.nim,
@@ -139,7 +164,9 @@ export const create = mutation({
       type: args.type,
       supervisor1Id: args.supervisor1Id,
       supervisor2Id: args.supervisor2Id,
-      status: 'requested',
+      examiner1Id: examiner1Id,
+      examiner2Id: examiner2Id,
+      status: finalStatus as any,
       notes: args.notes,
       createdAt: now,
     });
