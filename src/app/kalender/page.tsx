@@ -34,6 +34,16 @@ const customDayPickerStyles = `
     font-weight: 600;
     color: #1a1a1a;
   }
+  .has-schedule {
+    font-weight: 800;
+    color: #059669 !important;
+    background-color: #d1fae5;
+    border-radius: 50%;
+  }
+  .rdp-day_selected.has-schedule {
+    background-color: #15803d !important;
+    color: white !important;
+  }
 `;
 
 // Skeleton components
@@ -80,6 +90,18 @@ export default function KalenderPage() {
 
   // Queries
   const schedules = useQuery(api.seminar_requests.getAllWithLecturers);
+
+  // Extract all dates that have schedules to highlight in calendar
+  const datesWithSchedules = React.useMemo(() => {
+    if (!schedules) return [];
+    
+    return schedules
+      .filter(s => s.status === 'scheduled' && s.scheduledDate)
+      .map(s => {
+        const [year, month, day] = s.scheduledDate!.split('-');
+        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      });
+  }, [schedules]);
 
   // Get schedules for the selected date
   const dailySchedules = React.useMemo(() => {
@@ -147,6 +169,12 @@ export default function KalenderPage() {
             month={currentMonth}
             onMonthChange={setCurrentMonth}
             showWeekNumber
+            modifiers={{
+              hasSchedule: datesWithSchedules
+            }}
+            modifiersClassNames={{
+              hasSchedule: 'has-schedule'
+            }}
             formatters={{
               formatMonthCaption: formatMonthCaption,
               formatWeekdayName: (date: Date) => {
