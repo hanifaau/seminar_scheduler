@@ -173,14 +173,14 @@ export const remove = mutation({
       throw new Error('Mata kuliah tidak ditemukan');
     }
 
-    // Check if course is used in any teaching schedule
+    // CASCADING DELETE: Hapus jadwal mengajar yang menggunakan mata kuliah ini
     const schedules = await ctx.db
       .query('teaching_schedules')
       .withIndex('by_course', (q) => q.eq('courseId', args.id))
       .collect();
 
-    if (schedules.length > 0) {
-      throw new Error('Mata kuliah tidak dapat dihapus karena sudah digunakan dalam jadwal');
+    for (const schedule of schedules) {
+      await ctx.db.delete(schedule._id);
     }
 
     await ctx.db.delete(args.id);
