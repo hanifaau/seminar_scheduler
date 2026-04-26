@@ -32,6 +32,7 @@ function TableRowSkeleton() {
       <td className="px-4 py-3"><Skeleton className="h-4 w-48" /></td>
       <td className="px-4 py-3"><Skeleton className="h-6 w-20" /></td>
       <td className="px-4 py-3"><Skeleton className="h-4 w-28" /></td>
+      <td className="px-4 py-3"><Skeleton className="h-8 w-24" /></td>
       <td className="px-4 py-3"><Skeleton className="h-6 w-28" /></td>
       <td className="px-4 py-3"><Skeleton className="h-8 w-20" /></td>
     </tr>
@@ -246,6 +247,7 @@ export default function PermohonanSeminarPage() {
                 <th className="px-4 py-3 text-left font-medium">Judul</th>
                 <th className="px-4 py-3 text-left font-medium">Jenis</th>
                 <th className="px-4 py-3 text-left font-medium">Pembimbing</th>
+                <th className="px-4 py-3 text-left font-medium">Jadwal & Ruangan</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-right font-medium">Aksi</th>
               </tr>
@@ -281,6 +283,7 @@ export default function PermohonanSeminarPage() {
                   <th className="px-4 py-3 text-left font-medium text-foreground">Judul</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground">Jenis</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground">Pembimbing</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground">Jadwal & Ruangan</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground">Status</th>
                   <th className="px-4 py-3 text-right font-medium text-foreground">Aksi</th>
                 </tr>
@@ -309,6 +312,17 @@ export default function PermohonanSeminarPage() {
                             </span>
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {request.scheduledDate ? (
+                          <div className="flex flex-col gap-0.5 text-xs">
+                            <span className="font-medium text-foreground">{request.scheduledDate}</span>
+                            <span className="text-muted-foreground">{request.scheduledStartTime} - {request.scheduledEndTime}</span>
+                            <span className="text-muted-foreground">Ruang: {request.scheduledRoom || '-'}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={statusInfo.variant}>
