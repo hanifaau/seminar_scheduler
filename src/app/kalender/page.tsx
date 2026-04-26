@@ -77,82 +77,49 @@ function getWeekDates(date: Date): Date[] {
 export default function KalenderPage() {
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date());
   const [currentMonth, setCurrentMonth] = React.useState<Date>(new Date());
-  const [selectedWeek, setSelectedWeek] = React.useState<Date[]>(getWeekDates(new Date()));
 
   // Queries
   const schedules = useQuery(api.seminar_requests.getAllWithLecturers);
 
-  // Get schedules for the selected week
-  const weeklySchedules = React.useMemo(() => {
-    if (!schedules || selectedWeek.length === 0) return [];
+  // Get schedules for the selected date
+  const dailySchedules = React.useMemo(() => {
+    if (!schedules || !selectedDate) return [];
 
-    // Format week dates to YYYY-MM-DD to match scheduledDate
-    const weekDateStrings = selectedWeek.map(d => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    const targetDateString = `${year}-${month}-${day}`;
+
+    const filtered = schedules.filter((schedule) => {
+      return schedule.status === 'scheduled' && schedule.scheduledDate === targetDateString;
     });
 
-    return schedules.filter((schedule) => {
-      return schedule.status === 'scheduled' && schedule.scheduledDate && weekDateStrings.includes(schedule.scheduledDate);
-    });
-  }, [schedules, selectedWeek]);
-
-  // Group schedules by day
-  const schedulesByDay = React.useMemo(() => {
-    const grouped: Record<number, any[]> = {};
-    HARI_INDONESIA.forEach((_, i) => {
-      grouped[i] = [];
-    });
-
-    weeklySchedules.forEach((schedule) => {
-      if (!schedule.scheduledDate) return;
-      const d = new Date(schedule.scheduledDate);
-      const dayNum = d.getDay(); // 0 is Sunday, 1 is Monday...
-      if (dayNum !== undefined) {
-        if (!grouped[dayNum]) grouped[dayNum] = [];
-        grouped[dayNum].push(schedule);
-      }
-    });
-
-    // Sort each day's schedules by time
-    Object.keys(grouped).forEach((key) => {
-      grouped[parseInt(key)].sort((a, b) =>
-        (a.scheduledStartTime || '').localeCompare(b.scheduledStartTime || '')
-      );
-    });
-
-    return grouped;
-  }, [weeklySchedules]);
+    filtered.sort((a, b) => (a.scheduledStartTime || '').localeCompare(b.scheduledStartTime || ''));
+    return filtered;
+  }, [schedules, selectedDate]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
-      setSelectedWeek(getWeekDates(date));
     }
   };
 
-  const navigateWeek = (direction: 'prev' | 'next') => {
+  const navigateDay = (direction: 'prev' | 'next') => {
     const currentDate = selectedDate || new Date();
     const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+    newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
     setSelectedDate(newDate);
-    setSelectedWeek(getWeekDates(newDate));
     setCurrentMonth(newDate);
   };
 
   const isLoading = schedules === undefined;
 
-  // Format week header
-  const weekHeader = React.useMemo(() => {
-    if (selectedWeek.length === 0) return '';
-    const start = selectedWeek[0];
-    const end = selectedWeek[6];
-    const weekNum = getWeekNumber(selectedDate || new Date());
-
-    return `Minggu ke-${weekNum}: ${start.getDate()} ${BULAN_INDONESIA[start.getMonth()]} - ${end.getDate()} ${BULAN_INDONESIA[end.getMonth()]} ${end.getFullYear()}`;
-  }, [selectedWeek, selectedDate]);
+  // Format day header
+  const dayHeader = React.useMemo(() => {
+    if (!selectedDate) return '';
+    const dayName = HARI_INDONESIA[selectedDate.getDay()];
+    return `${dayName}, ${selectedDate.getDate()} ${BULAN_INDONESIA[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`;
+  }, [selectedDate]);
 
   // Format month caption
   const formatMonthCaption = (date: Date) => {
@@ -190,25 +157,25 @@ export default function KalenderPage() {
           />
         </div>
 
-        {/* Weekly Schedule */}
+        {/* Daily Schedule */}
         <div className="space-y-4">
-          {/* Week Navigation */}
+          {/* Day Navigation */}
           <div className="flex items-center justify-between bg-card rounded-lg border p-4">
-            <Button variant="outline" size="icon" onClick={() => navigateWeek('prev')}>
+            <Button variant="outline" size="icon" onClick={() => navigateDay('prev')}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="text-center">
-              <p className="font-semibold text-foreground">{weekHeader}</p>
+              <p className="font-semibold text-foreground">{dayHeader}</p>
               <p className="text-sm text-muted-foreground">
-                Klik tanggal pada kalender untuk memilih minggu
+                Klik tanggal pada kalender untuk melihat jadwal
               </p>
             </div>
-            <Button variant="outline" size="icon" onClick={() => navigateWeek('next')}>
+            <Button variant="outline" size="icon" onClick={() => navigateDay('next')}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
 
-          {/* Schedule Cards by Day */}
+          {/* Schedule Cards */}
           {isLoading ? (
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
@@ -220,39 +187,25 @@ export default function KalenderPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {selectedWeek.map((date, dayIndex) => {
-                const daySchedules = schedulesByDay[dayIndex] || [];
-                const isToday = date.toDateString() === new Date().toDateString();
-
-                return (
-                  <div
-                    key={dayIndex}
-                    className={cn(
-                      'rounded-lg border p-4',
-                      isToday && 'border-primary bg-primary/5'
-                    )}
-                  >
+                  <div className="rounded-lg border p-4 border-primary bg-primary/5">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold text-foreground">
-                          {HARI_INDONESIA[dayIndex]}
+                          Jadwal Sidang
                         </h3>
-                        {isToday && (
+                        {selectedDate?.toDateString() === new Date().toDateString() && (
                           <Badge variant="success" className="text-xs">Hari Ini</Badge>
                         )}
                       </div>
-                      <span className="text-sm text-muted-foreground">
-                        {date.getDate()} {BULAN_INDONESIA[date.getMonth()]}
-                      </span>
                     </div>
 
-                    {daySchedules.length === 0 ? (
+                    {dailySchedules.length === 0 ? (
                       <p className="text-sm text-muted-foreground py-2">
-                        Tidak ada jadwal seminar
+                        Tidak ada jadwal seminar pada tanggal ini
                       </p>
                     ) : (
-                      <div className="space-y-2">
-                        {daySchedules.map((schedule) => (
+                      <div className="space-y-3">
+                        {dailySchedules.map((schedule) => (
                           <div
                             key={schedule._id}
                             className="flex flex-col gap-2 p-3 bg-muted/30 rounded-lg border hover:bg-muted/50 transition-colors"
@@ -289,8 +242,6 @@ export default function KalenderPage() {
                       </div>
                     )}
                   </div>
-                );
-              })}
             </div>
           )}
         </div>
