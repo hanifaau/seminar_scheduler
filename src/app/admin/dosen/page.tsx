@@ -56,8 +56,8 @@ function parseDosenCSV(file: File): Promise<{ nama: string; nip: string }[]> {
       transformHeader: (header) => {
         const h = header.toLowerCase().trim();
         if (h.includes('nama')) return 'nama';
-        if (h.includes('nip') || h.includes('no')) return 'nip';
-        if (h.includes('index') || h.includes('no')) return 'index';
+        // Hanya tangkap NIP, NIDN, NIK, atau kata "induk"
+        if (h === 'nip' || h === 'nidn' || h === 'nik' || h.includes('induk')) return 'nip';
         return h;
       },
       complete: (results) => {
@@ -465,8 +465,14 @@ export default function ManajemenDosenPage() {
                 <Label htmlFor="phone">No. WhatsApp (opsional)</Label>
                 <Input
                   id="phone"
+                  type="tel"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) => {
+                    // Sanitasi: Hapus semua karakter kecuali angka dan simbol plus (+)
+                    // Ini penting untuk membuang karakter 'invisible' hasil copy-paste dari WhatsApp
+                    const sanitized = e.target.value.replace(/[^\d+]/g, '');
+                    setFormData({ ...formData, phone: sanitized });
+                  }}
                   placeholder="contoh: 08123456789"
                 />
               </div>
@@ -532,8 +538,12 @@ export default function ManajemenDosenPage() {
                 <Label htmlFor="edit-phone">No. WhatsApp</Label>
                 <Input
                   id="edit-phone"
+                  type="tel"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) => {
+                    const sanitized = e.target.value.replace(/[^\d+]/g, '');
+                    setFormData({ ...formData, phone: sanitized });
+                  }}
                   placeholder="contoh: 08123456789"
                 />
               </div>
