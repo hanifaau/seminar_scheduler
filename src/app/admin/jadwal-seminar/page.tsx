@@ -96,6 +96,7 @@ export default function JadwalSeminarPage() {
   const [sendNotification, setSendNotification] = React.useState(false);
   const [isSendingNotification, setIsSendingNotification] = React.useState(false);
   const [notificationResults, setNotificationResults] = React.useState<NotificationResult[] | null>(null);
+  const [isScheduledSuccess, setIsScheduledSuccess] = React.useState(false);
 
   // Queries
   const requests = useQuery(api.seminar_requests.getByStatusWithLecturers, { status: 'allocated' });
@@ -116,11 +117,13 @@ export default function JadwalSeminarPage() {
     setRoom('');
     setSendNotification(false);
     setNotificationResults(null);
+    setIsScheduledSuccess(false);
   };
 
   const handleSelectSlot = (slot: TimeSlot) => {
     setSelectedSlot(slot);
     setNotificationResults(null);
+    setIsScheduledSuccess(false);
   };
 
   const handleCheckNextWeek = () => {
@@ -151,6 +154,7 @@ export default function JadwalSeminarPage() {
       });
 
       toast.success('Seminar berhasil dijadwalkan');
+      setIsScheduledSuccess(true);
 
       // Then, send WhatsApp notification if checkbox is checked
       if (sendNotification) {
@@ -199,6 +203,7 @@ export default function JadwalSeminarPage() {
     setWeekOffset(0);
     setSendNotification(false);
     setNotificationResults(null);
+    setIsScheduledSuccess(false);
   };
 
   const isLoading = requests === undefined;
@@ -436,35 +441,48 @@ export default function JadwalSeminarPage() {
 
               {/* Action Buttons */}
               <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={handleReset}
-                  disabled={isSubmitting || isSendingNotification}
-                >
-                  Batal
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={handleSchedule}
-                  disabled={!selectedSlot || isSubmitting || isSendingNotification}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Menyimpan...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      Jadwalkan Seminar
-                    </>
-                  )}
-                </Button>
+                {isScheduledSuccess ? (
+                  <Button
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    onClick={handleReset}
+                    disabled={isSendingNotification}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Selesai
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={handleReset}
+                      disabled={isSubmitting || isSendingNotification}
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={handleSchedule}
+                      disabled={!selectedSlot || isSubmitting || isSendingNotification}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Menyimpan...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          Jadwalkan Seminar
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
               </div>
 
               {/* Notification info when sending */}
-              {sendNotification && selectedSlot && (
+              {sendNotification && selectedSlot && !isScheduledSuccess && (
                 <p className="text-xs text-center text-muted-foreground">
                   Setelah penjadwalan berhasil, notifikasi WhatsApp akan dikirim ke semua dosen
                 </p>
