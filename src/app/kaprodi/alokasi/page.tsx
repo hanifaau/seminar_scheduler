@@ -105,9 +105,11 @@ export default function AlokasiPengujiPage() {
   const displayedLecturers = React.useMemo(() => {
     if (!searchQuery) return filteredLecturers;
     return filteredLecturers.filter((l) =>
-      l.name.toLowerCase().includes(searchQuery.toLowerCase())
+      l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      l._id === examiner1Id ||
+      l._id === examiner2Id
     );
-  }, [filteredLecturers, searchQuery]);
+  }, [filteredLecturers, searchQuery, examiner1Id, examiner2Id]);
 
   // Check if a lecturer is a supervisor
   const isSupervisor = (lecturerId: string) => {
@@ -344,29 +346,48 @@ export default function AlokasiPengujiPage() {
               </div>
 
               {/* Filters */}
-              <div className="flex gap-3">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Cari nama dosen..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
+              <div className="flex flex-col gap-2 mb-2">
+                <div className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Cari nama dosen..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Select value={expertiseFilter} onValueChange={setExpertiseFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter kepakaran" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="semua">Semua Kepakaran</SelectItem>
+                      {expertiseCategories?.map((cat) => (
+                        <SelectItem key={cat._id} value={cat.name}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select value={expertiseFilter} onValueChange={setExpertiseFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter kepakaran" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="semua">Semua Kepakaran</SelectItem>
-                    {expertiseCategories?.map((cat) => (
-                      <SelectItem key={cat._id} value={cat.name}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="text-xs text-muted-foreground flex items-center justify-between">
+                  <span>
+                    {searchQuery || expertiseFilter !== 'semua' ? 'Menyaring ' : 'Tersedia '} 
+                    <strong className="text-foreground">{displayedLecturers.length}</strong> dosen
+                  </span>
+                  {(searchQuery || expertiseFilter !== 'semua') && (
+                    <button 
+                      onClick={() => {
+                        setSearchQuery('');
+                        setExpertiseFilter('semua');
+                      }}
+                      className="text-primary hover:underline"
+                    >
+                      Reset Filter
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Examiner 1 */}
