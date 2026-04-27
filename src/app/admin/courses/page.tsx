@@ -400,8 +400,11 @@ export default function MasterCoursesPage() {
                     onChange={(e) => setFormData({ ...formData, sks: Number(e.target.value) })}
                     className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
+                    <option value={1}>1 SKS</option>
                     <option value={2}>2 SKS</option>
                     <option value={3}>3 SKS</option>
+                    <option value={4}>4 SKS</option>
+                    <option value={6}>6 SKS</option>
                   </select>
                 </div>
               </div>
