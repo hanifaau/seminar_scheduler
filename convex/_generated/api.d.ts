@@ -12,6 +12,7 @@ import type * as courses from "../courses.js";
 import type * as expertise_categories from "../expertise_categories.js";
 import type * as lecturers from "../lecturers.js";
 import type * as notifications from "../notifications.js";
+import type * as rooms from "../rooms.js";
 import type * as scheduling from "../scheduling.js";
 import type * as seminar_requests from "../seminar_requests.js";
 import type * as staff from "../staff.js";
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   expertise_categories: typeof expertise_categories;
   lecturers: typeof lecturers;
   notifications: typeof notifications;
+  rooms: typeof rooms;
   scheduling: typeof scheduling;
   seminar_requests: typeof seminar_requests;
   staff: typeof staff;
