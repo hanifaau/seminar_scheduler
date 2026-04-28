@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 import { Calendar, Clock, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, Loader2, User } from 'lucide-react';
+import { useQuery } from 'convex/react';
+import { api } from 'convex/_generated/api';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/atoms/Button';
 import { Badge } from '@/components/atoms/Badge';
@@ -333,6 +335,12 @@ interface SlotSummaryProps {
 }
 
 export function SlotSummary({ slot, seminarType, room, onRoomChange }: SlotSummaryProps) {
+  const availableRooms = useQuery(api.scheduling.getAvailableRooms, slot ? {
+    date: slot.date,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+  } : 'skip');
+
   if (!slot) return null;
 
   const SEMINAR_TYPES: Record<string, string> = {
@@ -397,14 +405,27 @@ export function SlotSummary({ slot, seminarType, room, onRoomChange }: SlotSumma
 
       {onRoomChange && (
         <div className="pt-3 border-t">
-          <label className="text-xs text-muted-foreground">Ruangan (opsional)</label>
-          <input
-            type="text"
+          <label className="text-xs text-muted-foreground">Ruangan</label>
+          <select
             value={room || ''}
             onChange={(e) => onRoomChange(e.target.value)}
-            placeholder="Contoh: Lab Komputer 1"
-            className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-          />
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+            disabled={!availableRooms}
+          >
+            <option value="">-- Pilih Ruangan --</option>
+            {availableRooms === undefined ? (
+              <option disabled>Memuat ruangan...</option>
+            ) : availableRooms.length === 0 ? (
+              <option disabled>Tidak ada ruangan yang tersedia di jam ini</option>
+            ) : (
+              availableRooms.map((r) => (
+                <option key={r._id} value={r.name}>{r.name} {r.capacity ? `(Kap: ${r.capacity})` : ''}</option>
+              ))
+            )}
+          </select>
+          {availableRooms && availableRooms.length === 0 && (
+             <p className="text-xs text-red-500 mt-1">Semua ruangan sedang terpakai pada slot waktu ini.</p>
+          )}
         </div>
       )}
     </div>
