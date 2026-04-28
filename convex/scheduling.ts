@@ -646,3 +646,81 @@ export const checkSlotAvailability = query({
     };
   },
 });
+
+// Get available rooms for a specific time slot
+export const getAvailableRooms = query({
+  args: {
+    date: v.string(), // YYYY-MM-DD
+    startTime: v.string(), // HH:mm
+    endTime: v.string(), // HH:mm
+  },
+  handler: async (ctx, args) => {
+    // 1. Fetch all active rooms
+    const allRooms = await ctx.db
+      .query('rooms')
+      .filter((q) => q.eq(q.field('status'), 'active'))
+      .collect();
+
+    if (allRooms.length === 0) {
+      return [];
+    }
+
+    const startMinutes = timeToMinutes(args.startTime);
+    const endMinutes = timeToMinutes(args.endTime);
+
+    const dayNameDate = new Date(args.date).toLocaleDateString('en-US', { weekday: 'long' });
+    const dayName = parseDayName(dayNameDate);
+
+    // 2. Fetch teaching schedules for this day
+    const daySchedules = await ctx.db
+      .query('teaching_schedules')
+      .withIndex('by_day', (q) => q.eq('day', dayName))
+      .collect();
+
+    const usedRoomsInClasses = new Set<string>();
+
+    for (const schedule of daySchedules) {
+      if (!schedule.room) continue;
+
+      const scheduleStart = timeToMinutes(schedule.startTime);
+      const scheduleEnd = timeToMinutes(schedule.endTime);
+
+      // Overlap condition
+      if (startMinutes < scheduleEnd && endMinutes > scheduleStart) {
+        usedRoomsInClasses.add(schedule.room.toLowerCase().trim());
+      }
+    }
+
+    // 3. Fetch scheduled seminars on this date
+    const scheduledSeminars = await ctx.db
+      .query('seminar_requests')
+      .filter((q) =>
+        q.and(
+          q.eq(q.field('status'), 'scheduled'),
+          q.eq(q.field('scheduledDate'), args.date)
+        )
+      )
+      .collect();
+
+    const usedRoomsInSeminars = new Set<string>();
+
+    for (const seminar of scheduledSeminars) {
+      if (!seminar.scheduledRoom) continue;
+
+      const seminarStart = timeToMinutes(seminar.scheduledStartTime || seminar.scheduledTime || '08:00');
+      const seminarEnd = timeToMinutes(seminar.scheduledEndTime || '10:00');
+
+      if (startMinutes < seminarEnd && endMinutes > seminarStart) {
+        usedRoomsInSeminars.add(seminar.scheduledRoom.toLowerCase().trim());
+      }
+    }
+
+    // 4. Filter available rooms
+    const availableRooms = allRooms.filter((room) => {
+      const roomNameLower = room.name.toLowerCase().trim();
+      return !usedRoomsInClasses.has(roomNameLower) && !usedRoomsInSeminars.has(roomNameLower);
+    });
+
+    return availableRooms;
+  },
+});
