@@ -272,7 +272,7 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <Link href="/kaprodi/alokasi">
+            <Link href="/admin/jadwal-seminar">
               <Button size="sm" className="rounded-xl">
                 Lihat Detail
               </Button>
