@@ -4,14 +4,16 @@ import { api } from './_generated/api';
 
 // Types for notification payload
 interface NotificationPayload {
-  lecturerName: string;
-  lecturerRole: string; // "Pembimbing Utama", "Pembimbing Pendamping", "Penguji 1", "Penguji 2"
+  messageType: 'undangan' | 'reminder';
   studentName: string;
   nim: string;
   seminarType: string;
   date: string;
   time: string;
   room: string;
+  supervisors: string[];
+  examiners: string[];
+  contactNumber?: string;
 }
 
 // Twilio API Configuration
@@ -40,20 +42,37 @@ function formatDateIndonesian(dateString: string): string {
 // Build WhatsApp message in Indonesian
 function buildWhatsAppMessage(payload: NotificationPayload): string {
   const formattedDate = formatDateIndonesian(payload.date);
+  
+  const pembimbingStr = payload.supervisors.length > 0 ? payload.supervisors.join(' & ') : '-';
+  const pengujiStr = payload.examiners.length > 0 ? payload.examiners.join(' & ') : '-';
+  const contact = payload.contactNumber || '+62 852-6314-8711';
+  
+  // Format waktu agar lebih ringkas (misal: "13.30 - 15.00 WIB")
+  let timeStr = payload.time;
+  if (timeStr.includes(':')) {
+    timeStr = timeStr.replace(/:/g, '.');
+  }
 
-  return `Yth. Bapak/Ibu ${payload.lecturerName},
+  const intro = payload.messageType === 'reminder'
+    ? `*REMINDER*\nSalam Bapak/Ibu..izin mengingatkan kembali terkait jadwal seminar mhs berikut ya Pak/Bu..`
+    : `Salam Bapak/Ibu..izin konfirmasi terkait jadwal seminar mhs berikut ya Pak/Bu..`;
 
-Anda dijadwalkan sebagai ${payload.lecturerRole} pada:
+  return `${intro} 
+*Jadwal ${payload.seminarType} Offline* a.n. *${payload.studentName}* NIM *${payload.nim}*
 
-Seminar: ${payload.seminarType}
-Mahasiswa: ${payload.studentName} / ${payload.nim}
-Waktu: ${formattedDate}, ${payload.time}
-Ruang: ${payload.room || 'Belum ditentukan'}
+Dijadwalkan 
 
-Mohon kehadiran Bapak/Ibu tepat waktu. Terima kasih.
+*${formattedDate}*
+*Jam ${timeStr}*
+*${payload.room || 'Belum ditentukan'}*
 
----
-Pesan ini dikirim otomatis oleh Sistem Penjadwalan Seminar TI Unand.`;
+Pembimbing : ${pembimbingStr}
+
+Penguji : ${pengujiStr}
+
+Mohon konfirmasinya Pak/Bu.. pada Admin Akademik S1 pada nomor berikut 
+${contact}
+Terima kasih..`;
 }
 
 // Helper to send Twilio message
@@ -133,14 +152,15 @@ export const sendWhatsAppNotification = action({
     }
 
     const message = buildWhatsAppMessage({
-      lecturerName: args.lecturerName,
-      lecturerRole: args.lecturerRole,
+      messageType: 'undangan', // Default for single notification
       studentName: args.studentName,
       nim: args.nim,
       seminarType: args.seminarType,
       date: args.date,
       time: args.time,
       room: args.room || 'Belum ditentukan',
+      supervisors: [args.lecturerName], // Just putting the lecturer name here as fallback
+      examiners: [],
     });
 
     try {
@@ -165,6 +185,7 @@ export const sendWhatsAppNotification = action({
 export const sendSeminarNotifications = action({
   args: {
     seminarRequestId: v.id('seminar_requests'),
+    messageType: v.union(v.literal('undangan'), v.literal('reminder')),
   },
   handler: async (ctx, args): Promise<{
     success: boolean;
@@ -183,22 +204,36 @@ export const sendSeminarNotifications = action({
     }
 
     const lecturers = [];
+    const supervisors = [];
+    const examiners = [];
 
     if (seminarRequest.supervisor1Id) {
       const supervisor1 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.supervisor1Id });
-      if (supervisor1) lecturers.push({ name: supervisor1.name, phone: supervisor1.phone, role: 'Pembimbing Utama' });
+      if (supervisor1) {
+        lecturers.push({ name: supervisor1.name, phone: supervisor1.phone, role: 'Pembimbing Utama' });
+        supervisors.push(supervisor1.name);
+      }
     }
     if (seminarRequest.supervisor2Id) {
       const supervisor2 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.supervisor2Id });
-      if (supervisor2) lecturers.push({ name: supervisor2.name, phone: supervisor2.phone, role: 'Pembimbing Pendamping' });
+      if (supervisor2) {
+        lecturers.push({ name: supervisor2.name, phone: supervisor2.phone, role: 'Pembimbing Pendamping' });
+        supervisors.push(supervisor2.name);
+      }
     }
     if (seminarRequest.examiner1Id) {
       const examiner1 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.examiner1Id });
-      if (examiner1) lecturers.push({ name: examiner1.name, phone: examiner1.phone, role: 'Penguji 1' });
+      if (examiner1) {
+        lecturers.push({ name: examiner1.name, phone: examiner1.phone, role: 'Penguji 1' });
+        examiners.push(examiner1.name);
+      }
     }
     if (seminarRequest.examiner2Id) {
       const examiner2 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.examiner2Id });
-      if (examiner2) lecturers.push({ name: examiner2.name, phone: examiner2.phone, role: 'Penguji 2' });
+      if (examiner2) {
+        lecturers.push({ name: examiner2.name, phone: examiner2.phone, role: 'Penguji 2' });
+        examiners.push(examiner2.name);
+      }
     }
 
     const timeRange = seminarRequest.scheduledStartTime && seminarRequest.scheduledEndTime
@@ -227,14 +262,15 @@ export const sendSeminarNotifications = action({
       }
 
       const message = buildWhatsAppMessage({
-        lecturerName: lecturer.name,
-        lecturerRole: lecturer.role,
+        messageType: args.messageType,
         studentName: seminarRequest.studentName,
         nim: seminarRequest.nim,
         seminarType: seminarTypeMap[seminarRequest.type] || seminarRequest.type,
         date: seminarRequest.scheduledDate || '',
         time: timeRange,
-        room: seminarRequest.scheduledRoom || 'Belum ditentukan',
+        room: seminarRequest.scheduledRoom || 'R. Seminar Lt. 1',
+        supervisors,
+        examiners,
       });
 
       try {
