@@ -396,11 +396,6 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold text-foreground">
               Antrean Penjadwalan
             </h2>
-            <Link href="/kaprodi/alokasi">
-              <Button variant="outline" size="sm" className="rounded-xl">
-                Kelola
-              </Button>
-            </Link>
           </div>
           <div className="table-elegant overflow-hidden">
             <div className="overflow-x-auto">
