@@ -148,6 +148,7 @@ export default function JadwalSeminarPage() {
     try {
       const results = await sendSeminarNotifications({
         seminarRequestId: requestId as any,
+        messageType: 'reminder',
       });
 
       const successCount = results.results.filter((r: NotificationResult) => r.success).length;
@@ -194,6 +195,7 @@ export default function JadwalSeminarPage() {
         try {
           const results = await sendSeminarNotifications({
             seminarRequestId: selectedRequest._id as any,
+            messageType: 'undangan',
           });
           setNotificationResults(results.results);
 
