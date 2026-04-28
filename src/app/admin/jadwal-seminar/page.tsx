@@ -173,6 +173,11 @@ export default function JadwalSeminarPage() {
       return;
     }
 
+    if (!room) {
+      toast.error('Ruangan wajib dipilih');
+      return;
+    }
+
     setIsSubmitting(true);
     setNotificationResults(null);
 
