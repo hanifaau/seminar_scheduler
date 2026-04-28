@@ -42,8 +42,8 @@ const DURATION_REQUIREMENTS: Record<string, number> = {
 
 // Global break times
 const GLOBAL_BREAKS = [
-  { start: '13:30', end: '15:40', name: 'Istirahat Siang' },
-  { start: '15:10', end: '16:00', name: 'Istirahat Ashar' },
+  { start: '12:00', end: '13:30', name: 'Istirahat Siang' },
+  { start: '15:40', end: '16:00', name: 'Istirahat Ashar' },
 ];
 
 // Days of the week (Indonesian)
