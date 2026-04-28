@@ -11,6 +11,7 @@ interface NextLecturerClass {
   className: string;
   classStart: string;
   minutesUntilClass: number;
+  isBreak?: boolean;
 }
 
 interface TimeSlot {
@@ -187,10 +188,19 @@ export function SlotPicker({
                           <div className="flex items-start gap-2 text-xs">
                             <User className="h-3 w-3 text-emerald-600 mt-0.5 flex-shrink-0" />
                             <div className="text-emerald-700 dark:text-emerald-300">
-                              <span className="font-medium">{slot.nextLecturerClass.lecturerName}</span>
-                              <span className="text-emerald-600 dark:text-emerald-400"> mengajar </span>
-                              <span className="font-medium">{slot.nextLecturerClass.className}</span>
-                              <span className="text-emerald-600 dark:text-emerald-400"> jam {slot.nextLecturerClass.classStart}</span>
+                              {slot.nextLecturerClass.isBreak ? (
+                                <>
+                                  <span className="font-medium">{slot.nextLecturerClass.className}</span>
+                                  <span className="text-emerald-600 dark:text-emerald-400"> pada jam {slot.nextLecturerClass.classStart}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-medium">{slot.nextLecturerClass.lecturerName}</span>
+                                  <span className="text-emerald-600 dark:text-emerald-400"> memiliki jadwal </span>
+                                  <span className="font-medium">{slot.nextLecturerClass.className}</span>
+                                  <span className="text-emerald-600 dark:text-emerald-400"> jam {slot.nextLecturerClass.classStart}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -268,10 +278,19 @@ export function SlotPicker({
                           <div className="flex items-start gap-2 text-xs">
                             <User className="h-3 w-3 text-amber-600 mt-0.5 flex-shrink-0" />
                             <div className="text-amber-700 dark:text-amber-300">
-                              <span className="font-medium">{slot.nextLecturerClass.lecturerName}</span>
-                              <span className="text-amber-600 dark:text-amber-400"> mengajar </span>
-                              <span className="font-medium">{slot.nextLecturerClass.className}</span>
-                              <span className="text-amber-600 dark:text-amber-400"> jam {slot.nextLecturerClass.classStart}</span>
+                              {slot.nextLecturerClass.isBreak ? (
+                                <>
+                                  <span className="font-medium">{slot.nextLecturerClass.className}</span>
+                                  <span className="text-amber-600 dark:text-amber-400"> pada jam {slot.nextLecturerClass.classStart}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-medium">{slot.nextLecturerClass.lecturerName}</span>
+                                  <span className="text-amber-600 dark:text-amber-400"> memiliki jadwal </span>
+                                  <span className="font-medium">{slot.nextLecturerClass.className}</span>
+                                  <span className="text-amber-600 dark:text-amber-400"> jam {slot.nextLecturerClass.classStart}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -356,9 +375,22 @@ export function SlotSummary({ slot, seminarType, room, onRoomChange }: SlotSumma
         {/* Next Class Warning */}
         {slot.nextLecturerClass && (
           <div className="mt-2 p-2 rounded bg-muted/50 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">{slot.nextLecturerClass.lecturerName}</span>
-            <span> akan {slot.nextLecturerClass.className} jam </span>
-            <span className="font-medium text-foreground">{slot.nextLecturerClass.classStart}</span>
+            {slot.nextLecturerClass.isBreak ? (
+              <>
+                <span>Mendekati waktu </span>
+                <span className="font-medium text-foreground">{slot.nextLecturerClass.className}</span>
+                <span> pada jam </span>
+                <span className="font-medium text-foreground">{slot.nextLecturerClass.classStart}</span>
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-foreground">{slot.nextLecturerClass.lecturerName}</span>
+                <span> memiliki jadwal </span>
+                <span className="font-medium text-foreground">{slot.nextLecturerClass.className}</span>
+                <span> jam </span>
+                <span className="font-medium text-foreground">{slot.nextLecturerClass.classStart}</span>
+              </>
+            )}
           </div>
         )}
       </div>
