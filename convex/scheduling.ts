@@ -289,9 +289,13 @@ export const getAvailableSlots = query({
     const requiredDuration = DURATION_REQUIREMENTS[seminarRequest.type] || 60;
     const alternativeDuration = requiredDuration - 10; // Secondary search duration
 
+    // Seminars cannot be scheduled on the same day (suddenly). Minimum notice is H+1.
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() + 1); // Start from tomorrow
+
     // Generate dates for the targeted week
     const weekOffset = args.weekOffset || 0;
-    const weekDates = generateWeekDates(new Date(), weekOffset);
+    const weekDates = generateWeekDates(startDate, weekOffset);
 
     const idealSlots: TimeSlot[] = [];
     const alternativeSlots: TimeSlot[] = [];
