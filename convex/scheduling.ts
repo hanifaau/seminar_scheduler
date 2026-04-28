@@ -28,7 +28,7 @@ interface LecturerBusySlot {
 
 // Working hours configuration
 const WORK_START = 8 * 60; // 08:00 in minutes
-const WORK_END = 17 * 60; // 17:00 in minutes
+const WORK_END = 17 * 60 + 40; // 17:40 in minutes
 const TRANSITION_GAP = 5; // 5 minutes transition buffer
 const MAX_RECOMMENDATIONS = 30; // Maximum slots to return
 
