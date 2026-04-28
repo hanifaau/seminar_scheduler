@@ -76,6 +76,10 @@ interface SeminarRequest {
   examiner2Id?: string;
   examiner2?: Lecturer | null;
   status: string;
+  scheduledDate?: string;
+  scheduledStartTime?: string;
+  scheduledEndTime?: string;
+  scheduledRoom?: string;
 }
 
 interface NotificationResult {
@@ -98,8 +102,13 @@ export default function JadwalSeminarPage() {
   const [notificationResults, setNotificationResults] = React.useState<NotificationResult[] | null>(null);
   const [isScheduledSuccess, setIsScheduledSuccess] = React.useState(false);
 
+  // Tabs and Reminders
+  const [activeTab, setActiveTab] = React.useState<'allocated' | 'scheduled'>('allocated');
+  const [sendingReminderId, setSendingReminderId] = React.useState<string | null>(null);
+
   // Queries
-  const requests = useQuery(api.seminar_requests.getByStatusWithLecturers, { status: 'allocated' });
+  const allocatedRequests = useQuery(api.seminar_requests.getByStatusWithLecturers, { status: 'allocated' });
+  const scheduledRequests = useQuery(api.seminar_requests.getByStatusWithLecturers, { status: 'scheduled' });
   const availableSlots = useQuery(
     api.scheduling.getAvailableSlots,
     selectedRequest
@@ -132,6 +141,29 @@ export default function JadwalSeminarPage() {
 
   const handleCheckPrevWeek = () => {
     setWeekOffset((prev) => Math.max(0, prev - 1));
+  };
+
+  const handleSendReminder = async (requestId: string) => {
+    setSendingReminderId(requestId);
+    try {
+      const results = await sendSeminarNotifications({
+        seminarRequestId: requestId as any,
+      });
+
+      const successCount = results.results.filter((r: NotificationResult) => r.success).length;
+      const totalCount = results.results.length;
+
+      if (results.success) {
+        toast.success(`Reminder WhatsApp berhasil dikirim ke ${successCount}/${totalCount} dosen`);
+      } else {
+        toast.warning(`Reminder terkirim ke ${successCount}/${totalCount} dosen. Beberapa gagal.`);
+      }
+    } catch (error: any) {
+      console.error('Reminder error:', error);
+      toast.error(`Gagal mengirim reminder: ${error.message}`);
+    } finally {
+      setSendingReminderId(null);
+    }
   };
 
   const handleSchedule = async () => {
@@ -206,7 +238,8 @@ export default function JadwalSeminarPage() {
     setIsScheduledSuccess(false);
   };
 
-  const isLoading = requests === undefined;
+  const isLoadingAllocated = allocatedRequests === undefined;
+  const isLoadingScheduled = scheduledRequests === undefined;
 
   return (
     <div className="space-y-6">
@@ -221,90 +254,192 @@ export default function JadwalSeminarPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: Request List */}
         <div className="space-y-4">
-          <h2 className="font-semibold text-foreground flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Siap Dijadwalkan ({requests?.length || 0})
-          </h2>
+          <div className="flex border-b">
+            <button
+              className={cn(
+                "flex-1 py-3 text-sm font-semibold border-b-2 transition-colors",
+                activeTab === 'allocated' 
+                  ? "border-primary text-primary" 
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
+              )}
+              onClick={() => {
+                setActiveTab('allocated');
+                handleReset();
+              }}
+            >
+              Menunggu Penjadwalan ({allocatedRequests?.length || 0})
+            </button>
+            <button
+              className={cn(
+                "flex-1 py-3 text-sm font-semibold border-b-2 transition-colors",
+                activeTab === 'scheduled' 
+                  ? "border-primary text-primary" 
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
+              )}
+              onClick={() => {
+                setActiveTab('scheduled');
+                handleReset();
+              }}
+            >
+              Sudah Terjadwal ({scheduledRequests?.length || 0})
+            </button>
+          </div>
 
-          {isLoading ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <CardSkeleton key={i} />
-              ))}
-            </div>
-          ) : requests && requests.length > 0 ? (
-            <div className="space-y-4">
-              {requests.map((request) => (
-                <div
-                  key={request._id}
-                  className={cn(
-                    'rounded-lg border p-4 cursor-pointer transition-all',
-                    selectedRequest?._id === request._id
-                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                      : 'hover:border-primary/30 hover:shadow-sm'
-                  )}
-                  onClick={() => handleSelectRequest(request as SeminarRequest)}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className="font-semibold text-foreground">{request.studentName}</p>
-                      <p className="text-sm text-muted-foreground">{request.nim}</p>
+          {activeTab === 'allocated' && (
+            isLoadingAllocated ? (
+              <div className="space-y-4 pt-2">
+                {[...Array(3)].map((_, i) => (
+                  <CardSkeleton key={i} />
+                ))}
+              </div>
+            ) : allocatedRequests && allocatedRequests.length > 0 ? (
+              <div className="space-y-4 pt-2">
+                {allocatedRequests.map((request) => (
+                  <div
+                    key={request._id}
+                    className={cn(
+                      'rounded-lg border p-4 cursor-pointer transition-all',
+                      selectedRequest?._id === request._id
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                        : 'hover:border-primary/30 hover:shadow-sm'
+                    )}
+                    onClick={() => handleSelectRequest(request as SeminarRequest)}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-semibold text-foreground">{request.studentName}</p>
+                        <p className="text-sm text-muted-foreground">{request.nim}</p>
+                      </div>
+                      <Badge variant="outline">
+                        {SEMINAR_TYPES[request.type]}
+                      </Badge>
                     </div>
-                    <Badge variant="outline">
-                      {SEMINAR_TYPES[request.type]}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-foreground line-clamp-2 mb-3">{request.title}</p>
+                    <p className="text-sm text-foreground line-clamp-2 mb-3">{request.title}</p>
 
-                  <div className="space-y-1.5 text-xs">
-                    {/* Supervisors */}
-                    <div className="flex items-start gap-2">
-                      <span className="text-muted-foreground min-w-[70px]">Pembimbing:</span>
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant="secondary" className="text-[10px]">
-                          {request.supervisor1?.name || '-'}
-                        </Badge>
-                        {request.supervisor2 && (
+                    <div className="space-y-1.5 text-xs">
+                      {/* Supervisors */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-muted-foreground min-w-[70px]">Pembimbing:</span>
+                        <div className="flex flex-wrap gap-1">
                           <Badge variant="secondary" className="text-[10px]">
-                            {request.supervisor2.name}
+                            {request.supervisor1?.name || '-'}
                           </Badge>
-                        )}
+                          {request.supervisor2 && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {request.supervisor2.name}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Examiners */}
-                    <div className="flex items-start gap-2">
-                      <span className="text-muted-foreground min-w-[70px]">Penguji:</span>
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant="info" className="text-[10px]">
-                          {request.examiner1?.name || '-'}
-                        </Badge>
-                        {request.examiner2 && (
+                      {/* Examiners */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-muted-foreground min-w-[70px]">Penguji:</span>
+                        <div className="flex flex-wrap gap-1">
                           <Badge variant="info" className="text-[10px]">
-                            {request.examiner2.name}
+                            {request.examiner1?.name || '-'}
                           </Badge>
-                        )}
+                          {request.examiner2 && (
+                            <Badge variant="info" className="text-[10px]">
+                              {request.examiner2.name}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {selectedRequest?._id === request._id && (
-                    <div className="mt-3 pt-3 border-t">
-                      <p className="text-xs text-primary font-medium">
-                        Terpilih - Lihat slot tersedia di panel kanan
-                      </p>
+                    {selectedRequest?._id === request._id && (
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs text-primary font-medium">
+                          Terpilih - Lihat slot tersedia di panel kanan
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border p-8 text-center bg-card mt-4">
+                <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Tidak ada seminar yang menunggu penjadwalan
+                </p>
+              </div>
+            )
+          )}
+
+          {activeTab === 'scheduled' && (
+            isLoadingScheduled ? (
+              <div className="space-y-4 pt-2">
+                {[...Array(3)].map((_, i) => (
+                  <CardSkeleton key={i} />
+                ))}
+              </div>
+            ) : scheduledRequests && scheduledRequests.length > 0 ? (
+              <div className="space-y-4 pt-2">
+                {scheduledRequests.map((request) => (
+                  <div
+                    key={request._id}
+                    className="rounded-lg border p-4 transition-all hover:border-primary/30 hover:shadow-sm"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-semibold text-foreground">{request.studentName}</p>
+                        <p className="text-sm text-muted-foreground">{request.nim}</p>
+                      </div>
+                      <Badge variant="outline">
+                        {SEMINAR_TYPES[request.type]}
+                      </Badge>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg border p-8 text-center bg-card">
-              <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                Tidak ada seminar yang menunggu penjadwalan
-              </p>
-            </div>
+                    <p className="text-sm text-foreground line-clamp-2 mb-3">{request.title}</p>
+
+                    <div className="rounded bg-muted/50 p-3 mb-4 text-xs space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5 text-primary" />
+                        <span className="font-medium text-foreground">{request.scheduledDate}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-3.5 w-3.5 text-primary" />
+                        <span className="font-medium text-foreground">
+                          {request.scheduledStartTime} - {request.scheduledEndTime} WIB
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 text-primary" />
+                        <span className="font-medium text-foreground">{request.scheduledRoom || 'Belum ditentukan'}</span>
+                      </div>
+                    </div>
+
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+                      onClick={() => handleSendReminder(request._id as string)}
+                      disabled={sendingReminderId === request._id}
+                    >
+                      {sendingReminderId === request._id ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> 
+                          Mengirim Reminder...
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="h-3.5 w-3.5 mr-2" /> 
+                          Kirim Reminder WhatsApp
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border p-8 text-center bg-card mt-4">
+                <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Belum ada seminar yang terjadwal
+                </p>
+              </div>
+            )
           )}
         </div>
 
