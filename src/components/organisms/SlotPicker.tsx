@@ -405,7 +405,7 @@ export function SlotSummary({ slot, seminarType, room, onRoomChange }: SlotSumma
 
       {onRoomChange && (
         <div className="pt-3 border-t">
-          <label className="text-xs text-muted-foreground">Ruangan</label>
+          <label className="text-xs text-muted-foreground">Ruangan <span className="text-red-500">*</span></label>
           <select
             value={room || ''}
             onChange={(e) => onRoomChange(e.target.value)}
