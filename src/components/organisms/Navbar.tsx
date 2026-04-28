@@ -32,6 +32,7 @@ const mainNavItems = [
 
 const adminNavItems = [
   { href: '/admin/dosen', label: 'Data Dosen', icon: Users },
+  { href: '/admin/ruangan', label: 'Data Ruangan', icon: Home },
   { href: '/admin/jadwal/unggah', label: 'Unggah Jadwal', icon: Upload },
   { href: '/admin/staff', label: 'Pegawai', icon: Users },
   { href: '/admin/roles', label: 'Pengaturan Jabatan', icon: UserCog },
