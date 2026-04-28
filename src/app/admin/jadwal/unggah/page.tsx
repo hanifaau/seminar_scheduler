@@ -11,7 +11,7 @@ import { Button } from '@/components/atoms/Button';
 import { Badge } from '@/components/atoms/Badge';
 import { cn } from '@/lib/utils';
 
-// Minimalist CSV format: Hari, Waktu, Mata Kuliah, Ruangan
+// Minimalist CSV format: Mata Kuliah, Hari, Waktu, Ruang
 interface ParsedScheduleRow {
   _rowNumber: number;
   hari: string;
@@ -69,11 +69,11 @@ function parseTimeRange(waktu: string): { start: string; end: string } | null {
 
 // Generate CSV template with MINIMALIST format
 function generateMinimalistTemplate(): string {
-  const headers = ['Hari', 'Waktu', 'Mata Kuliah', 'Ruangan'];
+  const headers = ['Mata Kuliah', 'Hari', 'Waktu', 'Ruang'];
   const sampleData = [
-    ['Senin', '07:30 - 10:00', 'Perencanaan dan Pengendalian Produksi', 'Lab. Komputer 1'],
-    ['Selasa', '10:10 - 12:40', 'Metode Statistik', 'Ruang Kelas A'],
-    ['Rabu', '13:30 - 16:00', 'Ergonomi', 'Lab. Ergonomi'],
+    ['Perencanaan dan Pengendalian Produksi', 'Senin', '07:30 - 10:00', 'Lab. Komputer 1'],
+    ['Metode Statistik', 'Selasa', '10:10 - 12:40', 'Ruang Kelas A'],
+    ['Ergonomi', 'Rabu', '13:30 - 16:00', 'Lab. Ergonomi'],
   ];
   const csvContent = [
     headers.join(','),
@@ -290,8 +290,8 @@ export default function UnggahJadwalPage() {
                   Format CSV Minimalis (Auto-Mapping)
                 </p>
                 <div className="bg-background rounded p-3 font-mono text-xs overflow-x-auto border">
-                  <p className="text-muted-foreground"># Kolom: Hari, Waktu, Mata Kuliah, Ruangan</p>
-                  <p className="text-muted-foreground"># Contoh: Senin, "07:30 - 10:00", "Metode Statistik", "Lab. Komputer 1"</p>
+                  <p className="text-muted-foreground"># Kolom: Mata Kuliah, Hari, Waktu, Ruang</p>
+                  <p className="text-muted-foreground"># Contoh: "Metode Statistik", Senin, "07:30 - 10:00", "Lab. Komputer 1"</p>
                 </div>
                 <div className="space-y-2 text-emerald-700 dark:text-emerald-400">
                   <p className="font-medium flex items-center gap-2">
@@ -333,7 +333,7 @@ export default function UnggahJadwalPage() {
               Seret file CSV ke sini atau klik untuk memilih
             </p>
             <p className="text-sm text-muted-foreground mb-6">
-              Format: <strong>Hari, Waktu, Mata Kuliah, Ruangan</strong>
+              Format: <strong>Mata Kuliah, Hari, Waktu, Ruang</strong>
             </p>
 
             <input
@@ -395,10 +395,10 @@ export default function UnggahJadwalPage() {
                 <thead className="bg-muted/50 sticky top-0">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium text-foreground">#</th>
+                    <th className="px-3 py-2 text-left font-medium text-foreground">Mata Kuliah</th>
                     <th className="px-3 py-2 text-left font-medium text-foreground">Hari</th>
                     <th className="px-3 py-2 text-left font-medium text-foreground">Waktu</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Mata Kuliah</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Ruangan</th>
+                    <th className="px-3 py-2 text-left font-medium text-foreground">Ruang</th>
                     <th className="px-3 py-2 text-left font-medium text-foreground">Dosen</th>
                     <th className="px-3 py-2 text-left font-medium text-foreground">Status</th>
                   </tr>
@@ -413,12 +413,12 @@ export default function UnggahJadwalPage() {
                       )}
                     >
                       <td className="px-3 py-2 text-muted-foreground">{row._rowNumber}</td>
+                      <td className="px-3 py-2 max-w-[200px] truncate" title={row.mataKuliah}>
+                        {row.mataKuliah}
+                      </td>
                       <td className="px-3 py-2">{row.hari}</td>
                       <td className="px-3 py-2 font-mono text-xs">
                         {row.waktuMulai} - {row.waktuSelesai}
-                      </td>
-                      <td className="px-3 py-2 max-w-[200px] truncate" title={row.mataKuliah}>
-                        {row.mataKuliah}
                       </td>
                       <td className="px-3 py-2">{row.ruangan || '-'}</td>
                       <td className="px-3 py-2">
