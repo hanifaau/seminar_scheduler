@@ -42,7 +42,7 @@ const DURATION_REQUIREMENTS: Record<string, number> = {
 
 // Global break times
 const GLOBAL_BREAKS = [
-  { start: '12:50', end: '13:30', name: 'Istirahat Siang' },
+  { start: '13:30', end: '15:40', name: 'Istirahat Siang' },
   { start: '15:10', end: '16:00', name: 'Istirahat Ashar' },
 ];
 
