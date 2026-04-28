@@ -2,6 +2,18 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
 export default defineSchema({
+  // Rooms table - stores available rooms for seminars and classes
+  rooms: defineTable({
+    name: v.string(), // e.g., "Ruang Seminar Lt.1"
+    capacity: v.optional(v.number()),
+    location: v.optional(v.string()),
+    status: v.optional(v.string()), // e.g., "active", "maintenance"
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index('by_name', ['name'])
+    .index('by_status', ['status']),
+
   // Lecturers table - stores lecturer information
   lecturers: defineTable({
     name: v.string(),
