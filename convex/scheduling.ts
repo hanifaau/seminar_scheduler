@@ -24,6 +24,7 @@ interface LecturerBusySlot {
   lecturerId?: string;
   lecturerName?: string;
   activity?: string;
+  isBreak?: boolean;
 }
 
 // Working hours configuration
@@ -314,6 +315,7 @@ export const getAvailableSlots = query({
           startTime: timeToMinutes(b.start),
           endTime: timeToMinutes(b.end),
           activity: b.name,
+          isBreak: true,
         });
       }
 
@@ -343,9 +345,10 @@ export const getAvailableSlots = query({
 
         const nextLecturerClass = nextClass ? {
           lecturerName: nextClass.lecturerName || 'Dosen',
-          className: nextClass.activity || 'Mengajar',
-          classStart: minutesToTime(nextClass.startTime + TRANSITION_GAP),
+          className: nextClass.activity || 'Jadwal lain',
+          classStart: minutesToTime(nextClass.startTime + (nextClass.isBreak ? 0 : TRANSITION_GAP)),
           minutesUntilClass: nextClass.startTime - window.end,
+          isBreak: !!nextClass.isBreak,
         } : undefined;
 
         // Check for ideal slot
