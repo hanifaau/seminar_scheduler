@@ -30,7 +30,7 @@ interface LecturerBusySlot {
 const WORK_START = 8 * 60; // 08:00 in minutes
 const WORK_END = 17 * 60; // 17:00 in minutes
 const TRANSITION_GAP = 5; // 5 minutes transition buffer
-const MAX_RECOMMENDATIONS = 10; // Maximum slots to return
+const MAX_RECOMMENDATIONS = 30; // Maximum slots to return
 
 // Duration requirements by seminar type (in minutes)
 const DURATION_REQUIREMENTS: Record<string, number> = {
@@ -38,6 +38,12 @@ const DURATION_REQUIREMENTS: Record<string, number> = {
   Hasil: 90,
   Sidang: 120,
 };
+
+// Global break times
+const GLOBAL_BREAKS = [
+  { start: '12:50', end: '13:30', name: 'Istirahat Siang' },
+  { start: '15:10', end: '16:00', name: 'Istirahat Ashar' },
+];
 
 // Days of the week (Indonesian)
 const DAYS_OF_WEEK = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
@@ -302,8 +308,17 @@ export const getAvailableSlots = query({
       // Get scheduled seminars for this date to avoid double booking
       const scheduledSeminars = await getScheduledSeminarsForDate(ctx, dateInfo.date);
 
+      // Add global breaks to scheduled seminars so they act as blocked time
+      for (const b of GLOBAL_BREAKS) {
+        scheduledSeminars.push({
+          startTime: timeToMinutes(b.start),
+          endTime: timeToMinutes(b.end),
+          activity: b.name,
+        });
+      }
+
       // Combine all busy slots for finding free windows
-      const allBusySlotsFlat = allLecturerBusySlots.flat();
+      const allBusySlotsFlat = allLecturerBusySlots.flat().concat(scheduledSeminars);
 
       // For each lecturer, find their free windows
       const allFreeWindows: Array<Array<{ start: number; end: number }>> = [];
@@ -335,27 +350,38 @@ export const getAvailableSlots = query({
 
         // Check for ideal slot
         if (windowDuration >= requiredDuration) {
-          idealSlots.push({
-            day: dateInfo.day,
-            date: dateInfo.date,
-            startTime: minutesToTime(window.start),
-            endTime: minutesToTime(window.start + requiredDuration),
-            type: 'ideal',
-            availableDuration: windowDuration,
-            nextLecturerClass,
-          });
+          let currentStart = window.start;
+          // Generate multiple slots within this free window
+          while (currentStart + requiredDuration <= window.end) {
+            idealSlots.push({
+              day: dateInfo.day,
+              date: dateInfo.date,
+              startTime: minutesToTime(currentStart),
+              endTime: minutesToTime(currentStart + requiredDuration),
+              type: 'ideal',
+              availableDuration: window.end - currentStart, // Remaining duration in this free block
+              nextLecturerClass,
+            });
+            // Step by requiredDuration to create sequential, non-overlapping slots (e.g. 08:00, 09:30, 11:00)
+            // You can also use a fixed interval like 30 or 60 if you want overlapping flexible choices
+            currentStart += requiredDuration; 
+          }
         }
         // Check for alternative slot
         else if (windowDuration >= alternativeDuration) {
-          alternativeSlots.push({
-            day: dateInfo.day,
-            date: dateInfo.date,
-            startTime: minutesToTime(window.start),
-            endTime: minutesToTime(window.start + alternativeDuration),
-            type: 'alternative',
-            availableDuration: windowDuration,
-            nextLecturerClass,
-          });
+          let currentStart = window.start;
+          while (currentStart + alternativeDuration <= window.end) {
+            alternativeSlots.push({
+              day: dateInfo.day,
+              date: dateInfo.date,
+              startTime: minutesToTime(currentStart),
+              endTime: minutesToTime(currentStart + alternativeDuration),
+              type: 'alternative',
+              availableDuration: window.end - currentStart,
+              nextLecturerClass,
+            });
+            currentStart += alternativeDuration;
+          }
         }
       }
     }
@@ -595,6 +621,15 @@ export const checkSlotAvailability = query({
 
       if (startMinutes < seminarEnd && endMinutes > seminarStart) {
         conflicts.push(`Bentrok dengan seminar ${seminar.studentName} (${seminar.scheduledStartTime || seminar.scheduledTime})`);
+      }
+    }
+
+    // Check global breaks
+    for (const b of GLOBAL_BREAKS) {
+      const breakStart = timeToMinutes(b.start);
+      const breakEnd = timeToMinutes(b.end);
+      if (startMinutes < breakEnd && endMinutes > breakStart) {
+        conflicts.push(`Bentrok dengan waktu ${b.name} (${b.start} - ${b.end})`);
       }
     }
 
