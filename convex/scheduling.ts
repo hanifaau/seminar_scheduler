@@ -111,7 +111,8 @@ async function getLecturerBusySlotsForDay(
 // Get already scheduled seminars for a specific date to avoid double booking
 async function getScheduledSeminarsForDate(
   ctx: any,
-  date: string
+  date: string,
+  lecturerIds: string[]
 ): Promise<LecturerBusySlot[]> {
   const scheduledSeminars = await ctx.db
     .query('seminar_requests')
@@ -123,9 +124,17 @@ async function getScheduledSeminarsForDate(
     )
     .collect();
 
-  return scheduledSeminars.map((s: any) => ({
+  const relevantSeminars = scheduledSeminars.filter((s: any) => {
+    return lecturerIds.includes(s.supervisor1Id) ||
+           (s.supervisor2Id && lecturerIds.includes(s.supervisor2Id)) ||
+           (s.examiner1Id && lecturerIds.includes(s.examiner1Id)) ||
+           (s.examiner2Id && lecturerIds.includes(s.examiner2Id));
+  });
+
+  return relevantSeminars.map((s: any) => ({
     startTime: timeToMinutes(s.scheduledStartTime || s.scheduledTime || '08:00'),
     endTime: timeToMinutes(s.scheduledEndTime || '10:00'),
+    activity: `Seminar ${s.studentName}`,
   }));
 }
 
@@ -311,7 +320,7 @@ export const getAvailableSlots = query({
       }
 
       // Get scheduled seminars for this date to avoid double booking
-      const scheduledSeminars = await getScheduledSeminarsForDate(ctx, dateInfo.date);
+      const scheduledSeminars = await getScheduledSeminarsForDate(ctx, dateInfo.date, lecturerIds);
 
       // Add global breaks to scheduled seminars so they act as blocked time
       for (const b of GLOBAL_BREAKS) {
