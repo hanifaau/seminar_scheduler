@@ -91,6 +91,7 @@ export default function UnggahJadwalPage() {
     slotsImported: number;
     lecturersLinked: number;
     coursesNotFound: string[];
+    lecturersNotFound?: string[];
     message: string;
   } | null>(null);
 
@@ -163,6 +164,11 @@ export default function UnggahJadwalPage() {
                 waktuMulai = parsed.start;
                 waktuSelesai = parsed.end;
               }
+            }
+
+            // Validate Dosen
+            if (!row.dosen?.trim()) {
+              errors.push('Dosen wajib diisi');
             }
 
             // Validate Mata Kuliah
@@ -305,12 +311,13 @@ export default function UnggahJadwalPage() {
                   </p>
                   <ol className="list-decimal pl-5 space-y-1">
                     <li>Sistem mencari mata kuliah berdasarkan <strong>nama yang sama persis</strong></li>
-                    <li>Jika kolom <strong>Dosen dikosongkan</strong>, jadwal akan di-assign ke <strong>seluruh tim pengampu</strong>.</li>
+                    <li>Kolom <strong>Dosen wajib diisi</strong>. Gunakan nama pendek seperti <em>Hanifa</em>, bukan gelar lengkap.</li>
                     <li>Jika kolom <strong>Dosen diisi</strong>, sistem akan mencari kecocokan nama dosen di Master Dosen dan hanya assign ke dosen tersebut (berguna untuk kelas paralel).</li>
+                    <li>Untuk lebih dari satu dosen, pisahkan nama dengan koma.</li>
                   </ol>
                 </div>
                 <div className="bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 p-2 rounded text-xs font-medium border border-amber-200 dark:border-amber-800">
-                  Important: Pastikan Nama Mata Kuliah di CSV <strong>sama persis</strong> dengan yang ada di Master Mata Kuliah!
+                  Important: Pastikan Nama Mata Kuliah di CSV <strong>sama persis</strong> dengan yang ada di Master Mata Kuliah, dan kolom <strong>Dosen wajib diisi</strong>.
                 </div>
               </div>
             </div>
@@ -338,7 +345,7 @@ export default function UnggahJadwalPage() {
               Seret file CSV ke sini atau klik untuk memilih
             </p>
             <p className="text-sm text-muted-foreground mb-6">
-              Format: <strong>Mata Kuliah, Hari, Waktu, Ruang</strong>
+              Format: <strong>Mata Kuliah, Dosen, Hari, Waktu, Ruang</strong>. Kolom <strong>Dosen wajib diisi</strong>.
             </p>
 
             <input
@@ -387,7 +394,7 @@ export default function UnggahJadwalPage() {
               <div className="flex items-center gap-2">
                 <LinkIcon className="h-5 w-5 text-blue-500" />
                 <span className="font-medium text-foreground">
-                  Akan dihubungkan ke {validRows.reduce((sum, r) => sum + r._lecturerCount, 0)} jadwal dosen
+                  Akan diproses {validRows.length} baris jadwal
                 </span>
               </div>
             )}
@@ -426,19 +433,8 @@ export default function UnggahJadwalPage() {
                         {row.waktuMulai} - {row.waktuSelesai}
                       </td>
                       <td className="px-3 py-2">{row.ruangan || '-'}</td>
-                      <td className="px-3 py-2">
-                        {row._courseFound ? (
-                          <Badge
-                            variant="secondary"
-                            className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-                          >
-                            {row._lecturerCount} dosen
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs">
-                            Tidak ditemukan
-                          </Badge>
-                        )}
+                      <td className="px-3 py-2 max-w-[180px] truncate" title={row.dosen}>
+                        {row.dosen || '-'}
                       </td>
                       <td className="px-3 py-2">
                         {row._isValid ? (
@@ -539,6 +535,20 @@ export default function UnggahJadwalPage() {
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {uploadResult.coursesNotFound.map((name) => (
+                    <Badge key={name} variant="outline" className="text-xs">
+                      {name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {uploadResult.lecturersNotFound && uploadResult.lecturersNotFound.length > 0 && (
+              <div className="mt-4 p-3 rounded bg-amber-100 dark:bg-amber-900/30">
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+                  Nama dosen tidak ditemukan:
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {uploadResult.lecturersNotFound.map((name) => (
                     <Badge key={name} variant="outline" className="text-xs">
                       {name}
                     </Badge>

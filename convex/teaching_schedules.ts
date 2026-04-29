@@ -323,6 +323,7 @@ export const importFromMinimalistCSV = mutation({
         time: v.string(),          // e.g., "07:30 - 09:10"
         courseName: v.string(),    // Must match EXACTLY with Master Course name
         room: v.string(),          // e.g., "Lab. Komputer 1"
+        lecturerNames: v.optional(v.string()),
       })
     ),
   },
@@ -331,6 +332,7 @@ export const importFromMinimalistCSV = mutation({
     let slotsImported = 0;
     let lecturersLinked = 0;
     let coursesNotFound: string[] = [];
+    let lecturersNotFound: string[] = [];
     let duplicatesSkipped = 0;
 
     // Build course name -> course mapping
@@ -338,6 +340,13 @@ export const importFromMinimalistCSV = mutation({
     const courseMap = new Map<string, typeof allCourses[0]>();
     for (const course of allCourses) {
       courseMap.set(course.name.toLowerCase().trim(), course);
+    }
+
+    // Get all lecturers and build lookup maps
+    const allLecturers = await ctx.db.query('lecturers').collect();
+    const lecturerIdMap = new Map<string, typeof allLecturers[0]>();
+    for (const lecturer of allLecturers) {
+      lecturerIdMap.set(lecturer._id.toString(), lecturer);
     }
 
     // Get all existing schedules to check for duplicates
@@ -348,9 +357,15 @@ export const importFromMinimalistCSV = mutation({
       scheduleKeys.add(key);
     }
 
+    const parseLecturerKeywords = (names: string) =>
+      names
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+
     // Process each schedule entry
     for (const scheduleData of args.schedules) {
-      const { day, time, courseName, room } = scheduleData;
+      const { day, time, courseName, room, lecturerNames } = scheduleData;
 
       // Parse time range (format: "07:30 - 09:10" or "07:30-09:10")
       const timeParts = time.split('-').map((t) => t.trim());
@@ -370,16 +385,61 @@ export const importFromMinimalistCSV = mutation({
         continue;
       }
 
-      // Get lecturer IDs from course
-      const lecturerIds = course.lecturerIds;
+      const courseLecturerIds = new Set(
+        (course.lecturerIds || []).map((lecturerId) => lecturerId.toString())
+      );
 
-      if (lecturerIds.length === 0) {
-        console.log(`[Import] Course "${courseName}" has no lecturers assigned`);
+      let matchedLecturerIds: Array<typeof allLecturers[0]['_id']> = [];
+
+      if (lecturerNames?.trim()) {
+        const keywords = parseLecturerKeywords(lecturerNames);
+        const matchedIds = new Set<string>();
+
+        for (const keyword of keywords) {
+          const matches = allLecturers.filter((lecturer) =>
+            lecturer.name.toLowerCase().includes(keyword.toLowerCase())
+          );
+
+          if (matches.length === 0) {
+            if (!lecturersNotFound.includes(keyword)) {
+              lecturersNotFound.push(keyword);
+            }
+            continue;
+          }
+
+          for (const lecturer of matches) {
+            const lecturerIdString = lecturer._id.toString();
+            if (courseLecturerIds.size === 0 || courseLecturerIds.has(lecturerIdString)) {
+              matchedIds.add(lecturerIdString);
+            }
+          }
+        }
+
+        matchedLecturerIds = Array.from(matchedIds).map(
+          (id) => lecturerIdMap.get(id)!._id
+        );
+      }
+
+      if (lecturerNames?.trim() && matchedLecturerIds.length === 0) {
+        console.log(
+          `[Import] Course "${courseName}" has no matching lecturers for specified names: ${lecturerNames}`
+        );
+        continue;
+      }
+
+      const targetLecturerIds = lecturerNames?.trim()
+        ? matchedLecturerIds
+        : course.lecturerIds || [];
+
+      if (targetLecturerIds.length === 0) {
+        console.log(
+          `[Import] Course "${courseName}" has no lecturers assigned or no matching lecturer names for ${lecturerNames}`
+        );
         continue;
       }
 
       // Create schedule entry for each lecturer
-      for (const lecturerId of lecturerIds) {
+      for (const lecturerId of targetLecturerIds) {
         // Check for duplicate
         const scheduleKey = `${lecturerId}-${day}-${startTime}-${endTime}`;
         if (scheduleKeys.has(scheduleKey)) {
@@ -412,6 +472,7 @@ export const importFromMinimalistCSV = mutation({
       slotsImported,
       lecturersLinked,
       coursesNotFound,
+      lecturersNotFound,
       duplicatesSkipped,
       message: `${slotsImported} slot berhasil diimpor dan dihubungkan ke ${lecturersLinked} jadwal dosen`,
     };
