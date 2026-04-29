@@ -55,13 +55,14 @@ function isValidTime(time: string): boolean {
   return /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/.test(time);
 }
 
-// Parse time range like "07:30 - 10:00" or "07:30-10:00"
+// Parse time range like "07:30 - 10:00", "07.30 - 10.00", "07:30-10:00" or "07.30-10.00"
 function parseTimeRange(waktu: string): { start: string; end: string } | null {
   const cleaned = waktu.replace(/\s+/g, '');
-  const match = cleaned.match(/^(\d{1,2}:\d{2})-(\d{1,2}:\d{2})$/);
+  const match = cleaned.match(/^(\d{1,2}[:\.][0-5]\d)-(\d{1,2}[:\.][0-5]\d)$/);
   if (match) {
-    const start = match[1].padStart(5, '0');
-    const end = match[2].padStart(5, '0');
+    const normalize = (value: string) => value.replace('.', ':').padStart(5, '0');
+    const start = normalize(match[1]);
+    const end = normalize(match[2]);
     if (isValidTime(start) && isValidTime(end)) {
       return { start, end };
     }
@@ -73,9 +74,9 @@ function parseTimeRange(waktu: string): { start: string; end: string } | null {
 function generateMinimalistTemplate(): string {
   const headers = ['Mata Kuliah', 'Dosen', 'Hari', 'Waktu', 'Ruang'];
   const sampleData = [
-    ['Perencanaan dan Pengendalian Produksi', 'Jonrinaldi', 'Senin', '07:30 - 10:00', 'Lab. Komputer 1'],
-    ['Metode Statistik', 'Hanifa', 'Selasa', '10:10 - 12:40', 'Ruang Kelas A'],
-    ['Kalkulus II', 'Aulia', 'Rabu', '13:30 - 16:00', 'Lab. Ergonomi'],
+    ['Perencanaan dan Pengendalian Produksi', 'Jonrinaldi', 'Senin', '07.30 - 10.00', 'Lab. Komputer 1'],
+    ['Metode Statistik', 'Hanifa', 'Selasa', '10.10 - 12.40', 'Ruang Kelas A'],
+    ['Kalkulus II', 'Aulia', 'Rabu', '13.30 - 16.00', 'Lab. Ergonomi'],
   ];
   const csvContent = [
     headers.join(','),
@@ -159,7 +160,7 @@ export default function UnggahJadwalPage() {
             } else {
               const parsed = parseTimeRange(row.waktu.trim());
               if (!parsed) {
-                errors.push(`Format waktu tidak valid. Gunakan format: HH:mm - HH:mm`);
+                errors.push(`Format waktu tidak valid. Gunakan format: HH.mm - HH.mm`);
               } else {
                 waktuMulai = parsed.start;
                 waktuSelesai = parsed.end;
@@ -302,7 +303,7 @@ export default function UnggahJadwalPage() {
                 </p>
                 <div className="bg-background rounded p-3 font-mono text-xs overflow-x-auto border">
                   <p className="text-muted-foreground"># Kolom: Mata Kuliah, Dosen, Hari, Waktu, Ruang</p>
-                  <p className="text-muted-foreground"># Contoh: "Kalkulus II", "Hanifa", Senin, "07:30 - 10:00", "Ruang A"</p>
+                  <p className="text-muted-foreground"># Contoh: "Kalkulus II", "Hanifa", Senin, "13.30 - 15.10", "Ruang A"</p>
                 </div>
                 <div className="space-y-2 text-emerald-700 dark:text-emerald-400">
                   <p className="font-medium flex items-center gap-2">
