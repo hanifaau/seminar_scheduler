@@ -158,12 +158,15 @@ export function SlotPicker({
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
                   {slots.map((slot, index) => (
                     <button
-                      key={`${slot.date}-${slot.startTime}-${index}`}
+                      key={`${slot.date}-${slot.startTime}-${slot.endTime}-${slot.type}-${index}`}
                       onClick={() => onSelectSlot(slot)}
                       className={cn(
                         'group relative flex flex-col p-3 rounded-lg border-2 text-left transition-all',
                         'hover:border-emerald-400 hover:shadow-md',
-                        selectedSlot?.date === slot.date && selectedSlot?.startTime === slot.startTime
+                        selectedSlot?.date === slot.date &&
+                          selectedSlot?.startTime === slot.startTime &&
+                          selectedSlot?.endTime === slot.endTime &&
+                          selectedSlot?.type === slot.type
                           ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 ring-2 ring-emerald-500/20'
                           : 'border-emerald-200 dark:border-emerald-900/50 bg-card'
                       )}
@@ -248,12 +251,15 @@ export function SlotPicker({
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
                   {slots.map((slot, index) => (
                     <button
-                      key={`${slot.date}-${slot.startTime}-${index}`}
+                      key={`${slot.date}-${slot.startTime}-${slot.endTime}-${slot.type}-${index}`}
                       onClick={() => onSelectSlot(slot)}
                       className={cn(
                         'group relative flex flex-col p-3 rounded-lg border-2 text-left transition-all',
                         'hover:border-amber-400 hover:shadow-md',
-                        selectedSlot?.date === slot.date && selectedSlot?.startTime === slot.startTime
+                        selectedSlot?.date === slot.date &&
+                          selectedSlot?.startTime === slot.startTime &&
+                          selectedSlot?.endTime === slot.endTime &&
+                          selectedSlot?.type === slot.type
                           ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 ring-2 ring-amber-500/20'
                           : 'border-amber-200 dark:border-amber-900/50 bg-card'
                       )}

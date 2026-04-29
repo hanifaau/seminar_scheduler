@@ -414,7 +414,7 @@ export const getAvailableSlots = query({
     // Deduplicate slots using unique key
     const uniqueMap = (slots: TimeSlot[]) => {
       const map = new Map<string, TimeSlot>();
-      slots.forEach(slot => map.set(`${slot.date}-${slot.startTime}`, slot));
+      slots.forEach(slot => map.set(`${slot.date}-${slot.startTime}-${slot.endTime}-${slot.type}`, slot));
       return Array.from(map.values());
     };
 
