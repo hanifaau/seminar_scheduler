@@ -380,11 +380,11 @@ export const getAvailableSlots = query({
             });
             // Step by requiredDuration to create sequential, non-overlapping slots (e.g. 08:00, 09:30, 11:00)
             // You can also use a fixed interval like 30 or 60 if you want overlapping flexible choices
-            currentStart += requiredDuration; 
+            currentStart += requiredDuration;
           }
         }
-        // Check for alternative slot
-        else if (windowDuration >= alternativeDuration) {
+        // Check for alternative slot in any sufficiently large window
+        if (windowDuration >= alternativeDuration) {
           let currentStart = window.start;
           while (currentStart + alternativeDuration <= window.end) {
             alternativeSlots.push({
