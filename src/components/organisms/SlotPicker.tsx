@@ -176,7 +176,10 @@ export function SlotPicker({
                         <span className="font-bold text-foreground text-lg">
                           {slot.startTime} - {slot.endTime}
                         </span>
-                        {selectedSlot?.date === slot.date && selectedSlot?.startTime === slot.startTime && (
+                        {selectedSlot?.date === slot.date &&
+                          selectedSlot?.startTime === slot.startTime &&
+                          selectedSlot?.endTime === slot.endTime &&
+                          selectedSlot?.type === slot.type && (
                           <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                         )}
                       </div>
@@ -269,7 +272,10 @@ export function SlotPicker({
                         <span className="font-bold text-foreground text-lg">
                           {slot.startTime} - {slot.endTime}
                         </span>
-                        {selectedSlot?.date === slot.date && selectedSlot?.startTime === slot.startTime && (
+                        {selectedSlot?.date === slot.date &&
+                          selectedSlot?.startTime === slot.startTime &&
+                          selectedSlot?.endTime === slot.endTime &&
+                          selectedSlot?.type === slot.type && (
                           <CheckCircle2 className="h-5 w-5 text-amber-500" />
                         )}
                       </div>
