@@ -11,14 +11,15 @@ import { Button } from '@/components/atoms/Button';
 import { Badge } from '@/components/atoms/Badge';
 import { cn } from '@/lib/utils';
 
-// Minimalist CSV format: Mata Kuliah, Hari, Waktu, Ruang
+// Minimalist CSV format: Mata Kuliah, Dosen, Hari, Waktu, Ruang
 interface ParsedScheduleRow {
   _rowNumber: number;
+  mataKuliah: string;
+  dosen: string;
   hari: string;
   waktu: string;
   waktuMulai: string;
   waktuSelesai: string;
-  mataKuliah: string;
   ruangan: string;
   _isValid: boolean;
   _courseFound: boolean;
@@ -35,9 +36,10 @@ function TableRowSkeleton() {
   return (
     <tr className="border-b">
       <td className="px-3 py-2"><Skeleton className="h-4 w-8" /></td>
+      <td className="px-3 py-2"><Skeleton className="h-4 w-40" /></td>
+      <td className="px-3 py-2"><Skeleton className="h-4 w-32" /></td>
       <td className="px-3 py-2"><Skeleton className="h-4 w-20" /></td>
       <td className="px-3 py-2"><Skeleton className="h-4 w-28" /></td>
-      <td className="px-3 py-2"><Skeleton className="h-4 w-40" /></td>
       <td className="px-3 py-2"><Skeleton className="h-4 w-24" /></td>
       <td className="px-3 py-2"><Skeleton className="h-6 w-16" /></td>
     </tr>
@@ -69,11 +71,11 @@ function parseTimeRange(waktu: string): { start: string; end: string } | null {
 
 // Generate CSV template with MINIMALIST format
 function generateMinimalistTemplate(): string {
-  const headers = ['Mata Kuliah', 'Hari', 'Waktu', 'Ruang'];
+  const headers = ['Mata Kuliah', 'Dosen', 'Hari', 'Waktu', 'Ruang'];
   const sampleData = [
-    ['Perencanaan dan Pengendalian Produksi', 'Senin', '07:30 - 10:00', 'Lab. Komputer 1'],
-    ['Metode Statistik', 'Selasa', '10:10 - 12:40', 'Ruang Kelas A'],
-    ['Ergonomi', 'Rabu', '13:30 - 16:00', 'Lab. Ergonomi'],
+    ['Perencanaan dan Pengendalian Produksi', 'Jonrinaldi', 'Senin', '07:30 - 10:00', 'Lab. Komputer 1'],
+    ['Metode Statistik', 'Hanifa', 'Selasa', '10:10 - 12:40', 'Ruang Kelas A'],
+    ['Kalkulus II', 'Aulia', 'Rabu', '13:30 - 16:00', 'Lab. Ergonomi'],
   ];
   const csvContent = [
     headers.join(','),
@@ -127,6 +129,7 @@ export default function UnggahJadwalPage() {
         if (h.includes('waktu') || h.includes('time') || h.includes('jam')) return 'waktu';
         if (h.includes('mata') || h.includes('kuliah') || h.includes('course') || h.includes('matkul')) return 'matakuliah';
         if (h.includes('ruang') || h.includes('room') || h.includes('ruangan')) return 'ruangan';
+        if (h.includes('dosen') || h.includes('pengajar') || h.includes('lecturer')) return 'dosen';
         return h;
       },
       complete: (results) => {
@@ -183,11 +186,12 @@ export default function UnggahJadwalPage() {
 
             validated.push({
               _rowNumber: rowNumber,
+              mataKuliah: row.matakuliah?.trim() || '',
+              dosen: row.dosen?.trim() || '',
               hari: row.hari?.trim() || '',
               waktu: row.waktu?.trim() || '',
               waktuMulai,
               waktuSelesai,
-              mataKuliah: row.matakuliah?.trim() || '',
               ruangan: row.ruangan?.trim() || '',
               _isValid: errors.length === 0,
               _courseFound: courseFound,
@@ -221,6 +225,7 @@ export default function UnggahJadwalPage() {
         time: row.waktu,
         courseName: row.mataKuliah,
         room: row.ruangan,
+        lecturerNames: row.dosen || undefined,
       }));
 
       const result = await importFromMinimalistCSV({ schedules: schedulesToImport });
@@ -290,22 +295,22 @@ export default function UnggahJadwalPage() {
                   Format CSV Minimalis (Auto-Mapping)
                 </p>
                 <div className="bg-background rounded p-3 font-mono text-xs overflow-x-auto border">
-                  <p className="text-muted-foreground"># Kolom: Mata Kuliah, Hari, Waktu, Ruang</p>
-                  <p className="text-muted-foreground"># Contoh: "Metode Statistik", Senin, "07:30 - 10:00", "Lab. Komputer 1"</p>
+                  <p className="text-muted-foreground"># Kolom: Mata Kuliah, Dosen, Hari, Waktu, Ruang</p>
+                  <p className="text-muted-foreground"># Contoh: "Kalkulus II", "Hanifa", Senin, "07:30 - 10:00", "Ruang A"</p>
                 </div>
                 <div className="space-y-2 text-emerald-700 dark:text-emerald-400">
                   <p className="font-medium flex items-center gap-2">
                     <LinkIcon className="h-4 w-4" />
                     Cara Kerja Auto-Mapping:
                   </p>
-                  <ol className="list-decimal list-inside space-y-1 text-xs">
+                  <ol className="list-decimal pl-5 space-y-1">
                     <li>Sistem mencari mata kuliah berdasarkan <strong>nama yang sama persis</strong></li>
-                    <li>Automatis mengambil daftar <strong>Tim Dosen Pengampu</strong> dari Master</li>
-                    <li>Membuat jadwal untuk <strong>setiap dosen</strong> yang terdaftar</li>
+                    <li>Jika kolom <strong>Dosen dikosongkan</strong>, jadwal akan di-assign ke <strong>seluruh tim pengampu</strong>.</li>
+                    <li>Jika kolom <strong>Dosen diisi</strong>, sistem akan mencari kecocokan nama dosen di Master Dosen dan hanya assign ke dosen tersebut (berguna untuk kelas paralel).</li>
                   </ol>
                 </div>
-                <div className="rounded bg-amber-100 dark:bg-amber-900/30 p-2 text-xs text-amber-800 dark:text-amber-300">
-                  <strong>Important:</strong> Pastikan Nama Mata Kuliah di CSV <strong>sama persis</strong> dengan yang ada di Master Mata Kuliah!
+                <div className="bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 p-2 rounded text-xs font-medium border border-amber-200 dark:border-amber-800">
+                  Important: Pastikan Nama Mata Kuliah di CSV <strong>sama persis</strong> dengan yang ada di Master Mata Kuliah!
                 </div>
               </div>
             </div>
