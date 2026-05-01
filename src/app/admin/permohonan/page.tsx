@@ -146,6 +146,8 @@ export default function PermohonanSeminarPage() {
         type: 'Proposal',
         supervisor1Id: '',
         supervisor2Id: '',
+        examiner1Id: '',
+        examiner2Id: '',
         notes: '',
       });
       setIsDialogOpen(false);
