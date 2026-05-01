@@ -322,8 +322,8 @@ export const importFromMinimalistCSV = mutation({
         day: v.string(),           // e.g., "Senin"
         time: v.string(),          // e.g., "07.30 - 09.10"
         courseName: v.string(),    // Must match EXACTLY with Master Course name
-        room: v.string(),          // e.g., "Lab. Komputer 1"
-        lecturerNames: v.string(), // Must be provided by CSV
+        room: v.optional(v.string()),      // e.g., "Lab. Komputer 1"
+        lecturerNames: v.optional(v.string()), // Must be provided by CSV, optional fallback
       })
     ),
   },
@@ -366,12 +366,7 @@ export const importFromMinimalistCSV = mutation({
     // Process each schedule entry
     for (const scheduleData of args.schedules) {
       const { day, time, courseName, room, lecturerNames } = scheduleData;
-      const lecturerNamesTrimmed = lecturerNames.trim();
-
-      if (!lecturerNamesTrimmed) {
-        console.log(`[Import] Lecturer names tidak boleh kosong untuk course "${courseName}"`);
-        continue;
-      }
+      const lecturerNamesTrimmed = lecturerNames ? lecturerNames.trim() : '';
 
       // Parse time range (format: "07.30 - 09.10" or "07:30-09:10")
       const timeParts = time.split('-').map((t) => t.trim());
@@ -395,41 +390,50 @@ export const importFromMinimalistCSV = mutation({
         (course.lecturerIds || []).map((lecturerId) => lecturerId.toString())
       );
 
-      const keywords = parseLecturerKeywords(lecturerNamesTrimmed);
-      const matchedIds = new Set<string>();
+      let targetLecturerIds: any[] = [];
 
-      for (const keyword of keywords) {
-        const matches = allLecturers.filter((lecturer) =>
-          lecturer.name.toLowerCase().includes(keyword.toLowerCase())
+      if (!lecturerNamesTrimmed) {
+        // Fallback: use all course lecturers
+        targetLecturerIds = Array.from(courseLecturerIds).map(
+          (id) => lecturerIdMap.get(id)!._id
+        );
+      } else {
+        const keywords = parseLecturerKeywords(lecturerNamesTrimmed);
+        const matchedIds = new Set<string>();
+
+        for (const keyword of keywords) {
+          const matches = allLecturers.filter((lecturer) =>
+            lecturer.name.toLowerCase().includes(keyword.toLowerCase())
+          );
+
+          if (matches.length === 0) {
+            if (!lecturersNotFound.includes(keyword)) {
+              lecturersNotFound.push(keyword);
+            }
+            continue;
+          }
+
+          for (const lecturer of matches) {
+            const lecturerIdString = lecturer._id.toString();
+            if (courseLecturerIds.size === 0 || courseLecturerIds.has(lecturerIdString)) {
+              matchedIds.add(lecturerIdString);
+            }
+          }
+        }
+
+        const matchedLecturerIds = Array.from(matchedIds).map(
+          (id) => lecturerIdMap.get(id)!._id
         );
 
-        if (matches.length === 0) {
-          if (!lecturersNotFound.includes(keyword)) {
-            lecturersNotFound.push(keyword);
-          }
+        if (matchedLecturerIds.length === 0) {
+          console.log(
+            `[Import] Course "${courseName}" has no matching lecturers for specified names: ${lecturerNamesTrimmed}`
+          );
           continue;
         }
 
-        for (const lecturer of matches) {
-          const lecturerIdString = lecturer._id.toString();
-          if (courseLecturerIds.size === 0 || courseLecturerIds.has(lecturerIdString)) {
-            matchedIds.add(lecturerIdString);
-          }
-        }
+        targetLecturerIds = matchedLecturerIds;
       }
-
-      const matchedLecturerIds = Array.from(matchedIds).map(
-        (id) => lecturerIdMap.get(id)!._id
-      );
-
-      if (matchedLecturerIds.length === 0) {
-        console.log(
-          `[Import] Course "${courseName}" has no matching lecturers for specified names: ${lecturerNamesTrimmed}`
-        );
-        continue;
-      }
-
-      const targetLecturerIds = matchedLecturerIds;
 
       if (targetLecturerIds.length === 0) {
         console.log(
