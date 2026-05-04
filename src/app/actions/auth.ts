@@ -5,8 +5,8 @@ import { redirect } from 'next/navigation';
 
 const VALID_USERS = [
   { username: 'Admin', password: 'AdminDTIS1', role: 'admin' },
-  { username: 'Kaprodi', password: 'KaprodiDTIS1', role: 'kaprodi' },
-  { username: 'Sekprodi', password: 'SekprodiDTIS1', role: 'sekprodi' },
+  { username: 'Ketua Program Studi', password: 'KaprodiDTIS1', role: 'kaprodi' },
+  { username: 'Sekretaris Program Studi', password: 'SekprodiDTIS1', role: 'sekprodi' },
 ];
 
 export async function loginUser(formData: FormData) {

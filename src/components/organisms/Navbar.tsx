@@ -60,6 +60,11 @@ export function Navbar() {
     (item) => pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
   );
 
+  // Jangan tampilkan Navbar di halaman login
+  if (pathname === '/login') {
+    return null;
+  }
+
   return (
     <motion.nav
       initial={{ y: -20, opacity: 0 }}
