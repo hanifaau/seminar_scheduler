@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Plus,
   X,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from 'convex/_generated/api';
@@ -46,6 +47,11 @@ export default function ManageExpertisePage() {
   const [isSaving, setIsSaving] = React.useState(false);
   const [isSeeding, setIsSeeding] = React.useState(false);
 
+  const [showAddForm, setShowAddForm] = React.useState(false);
+  const [newCategoryName, setNewCategoryName] = React.useState('');
+  const [newCategoryDesc, setNewCategoryDesc] = React.useState('');
+  const [isAddingCategory, setIsAddingCategory] = React.useState(false);
+
   // Queries
   const lecturers = useQuery(api.lecturers.getAll);
   const expertiseCategories = useQuery(api.expertise_categories.getAll);
@@ -53,6 +59,8 @@ export default function ManageExpertisePage() {
   // Mutations
   const updateExpertise = useMutation(api.lecturers.updateExpertise);
   const seedCategories = useMutation(api.expertise_categories.seed);
+  const createCategory = useMutation(api.expertise_categories.create);
+  const removeCategory = useMutation(api.expertise_categories.remove);
 
   // Filter lecturers by search
   const filteredLecturers = React.useMemo(() => {
@@ -137,6 +145,39 @@ export default function ManageExpertisePage() {
       toast.error(error.message || 'Gagal menambahkan kategori');
     } finally {
       setIsSeeding(false);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast.error('Nama kepakaran tidak boleh kosong');
+      return;
+    }
+    setIsAddingCategory(true);
+    try {
+      await createCategory({
+        name: newCategoryName.trim(),
+        description: newCategoryDesc.trim() || undefined,
+      });
+      toast.success('Kepakaran berhasil ditambahkan');
+      setNewCategoryName('');
+      setNewCategoryDesc('');
+      setShowAddForm(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Gagal menambahkan kepakaran');
+    } finally {
+      setIsAddingCategory(false);
+    }
+  };
+
+  const handleRemoveCategory = async (id: any, name: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus kepakaran "${name}" secara permanen?`)) return;
+    try {
+      await removeCategory({ id });
+      toast.success('Kepakaran berhasil dihapus');
+      setSelectedExpertise((prev) => prev.filter((e) => e !== name));
+    } catch (error: any) {
+      toast.error(error.message || 'Gagal menghapus kepakaran');
     }
   };
 
@@ -325,15 +366,42 @@ export default function ManageExpertisePage() {
             </div>
 
             {/* Search Expertise */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Cari kepakaran..."
-                value={searchExpertise}
-                onChange={(e) => setSearchExpertise(e.target.value)}
-                className="pl-9"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari kepakaran..."
+                  value={searchExpertise}
+                  onChange={(e) => setSearchExpertise(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Button onClick={() => setShowAddForm(!showAddForm)} variant={showAddForm ? 'secondary' : 'default'} className="shrink-0">
+                <Plus className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">Tambah</span>
+              </Button>
             </div>
+
+            {/* Add Category Form */}
+            {showAddForm && (
+              <div className="p-4 rounded-lg border border-primary/20 bg-primary/5 space-y-3">
+                <Input
+                  placeholder="Nama Kepakaran (mis. Artificial Intelligence)"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                />
+                <Input
+                  placeholder="Deskripsi singkat (opsional)"
+                  value={newCategoryDesc}
+                  onChange={(e) => setNewCategoryDesc(e.target.value)}
+                />
+                <div className="flex gap-2 justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setShowAddForm(false)}>Batal</Button>
+                  <Button size="sm" onClick={handleAddCategory} disabled={isAddingCategory}>
+                    {isAddingCategory ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Simpan'}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Selected Count */}
             {selectedLecturer && (
@@ -371,15 +439,14 @@ export default function ManageExpertisePage() {
                   {filteredExpertise.map((category) => {
                     const isSelected = selectedExpertise.includes(category.name);
                     return (
-                      <button
+                      <div
                         key={category._id}
                         onClick={() => selectedLecturer && toggleExpertise(category.name)}
-                        disabled={!selectedLecturer}
                         className={cn(
                           'w-full p-3 text-left transition-colors flex items-center justify-between',
                           selectedLecturer
                             ? 'hover:bg-muted/50 cursor-pointer'
-                            : 'cursor-not-allowed opacity-60'
+                            : 'opacity-60'
                         )}
                       >
                         <div className="flex items-center gap-3">
@@ -402,7 +469,18 @@ export default function ManageExpertisePage() {
                             )}
                           </div>
                         </div>
-                      </button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveCategory(category._id, category.name);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     );
                   })}
                 </div>
