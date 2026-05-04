@@ -18,9 +18,11 @@ import {
   UserCog,
   GraduationCap,
   ChevronDown,
+  LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/atoms/Button';
 import { cn } from '@/lib/utils';
+import { logoutUser } from '@/app/actions/auth';
 
 const mainNavItems = [
   { href: '/', label: 'Beranda', icon: Home },
@@ -191,6 +193,17 @@ export function Navbar() {
                 )}
               </AnimatePresence>
             </div>
+            {/* Logout Button (Desktop) */}
+            <div className="ml-2 pl-2 border-l border-border/50">
+              <Button
+                variant="ghost"
+                onClick={() => logoutUser()}
+                className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl px-3"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="text-sm font-medium">Keluar</span>
+              </Button>
+            </div>
           </div>
 
           {/* Mobile menu button */}
@@ -304,6 +317,26 @@ export function Navbar() {
                   </motion.div>
                 );
               })}
+
+              {/* Logout Button (Mobile) */}
+              <motion.div
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="pt-4 mt-4 border-t border-white/10"
+              >
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setIsOpen(false);
+                    logoutUser();
+                  }}
+                  className="w-full flex items-center justify-start gap-3 px-4 py-3 rounded-xl text-base font-medium text-red-500 hover:text-red-600 hover:bg-red-50 transition-all"
+                >
+                  <LogOut className="h-5 w-5" />
+                  Keluar
+                </Button>
+              </motion.div>
             </div>
           </motion.div>
         )}
