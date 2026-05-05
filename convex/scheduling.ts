@@ -296,7 +296,7 @@ export const getAvailableSlots = query({
 
     // Get required duration
     const requiredDuration = DURATION_REQUIREMENTS[seminarRequest.type] || 60;
-    const alternativeDuration = requiredDuration - 10; // Secondary search duration
+    const alternativeDuration = 40; // Minimum allowed duration for alternative slots
 
     // Seminars cannot be scheduled on the same day (suddenly). Minimum notice is H+1.
     const startDate = new Date();
@@ -365,8 +365,8 @@ export const getAvailableSlots = query({
         } : undefined;
 
         // Check for ideal slot
+        let currentStart = window.start;
         if (windowDuration >= requiredDuration) {
-          let currentStart = window.start;
           // Generate multiple slots within this free window
           while (currentStart + requiredDuration <= window.end) {
             idealSlots.push({
@@ -375,29 +375,25 @@ export const getAvailableSlots = query({
               startTime: minutesToTime(currentStart),
               endTime: minutesToTime(currentStart + requiredDuration),
               type: 'ideal',
-              availableDuration: window.end - currentStart, // Remaining duration in this free block
+              availableDuration: requiredDuration,
               nextLecturerClass,
             });
-            // Step by requiredDuration to create sequential, non-overlapping slots (e.g. 08:00, 09:30, 11:00)
-            // You can also use a fixed interval like 30 or 60 if you want overlapping flexible choices
             currentStart += requiredDuration;
           }
         }
-        // Check for alternative slot in any sufficiently large window
-        if (windowDuration >= alternativeDuration) {
-          let currentStart = window.start;
-          while (currentStart + alternativeDuration <= window.end) {
-            alternativeSlots.push({
-              day: dateInfo.day,
-              date: dateInfo.date,
-              startTime: minutesToTime(currentStart),
-              endTime: minutesToTime(currentStart + alternativeDuration),
-              type: 'alternative',
-              availableDuration: window.end - currentStart,
-              nextLecturerClass,
-            });
-            currentStart += alternativeDuration;
-          }
+        
+        // Any remaining duration >= 40 becomes an alternative slot
+        const remainingDuration = window.end - currentStart;
+        if (remainingDuration >= 40 && remainingDuration < requiredDuration) {
+          alternativeSlots.push({
+            day: dateInfo.day,
+            date: dateInfo.date,
+            startTime: minutesToTime(currentStart),
+            endTime: minutesToTime(window.end),
+            type: 'alternative',
+            availableDuration: remainingDuration,
+            nextLecturerClass,
+          });
         }
       }
     }

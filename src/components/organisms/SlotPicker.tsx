@@ -231,7 +231,7 @@ export function SlotPicker({
               Slot Alternatif ({alternativeSlots.length})
             </span>
             <span className="text-xs text-muted-foreground">
-              - Durasi {alternativeDuration || requiredDuration - 10} menit
+              - Durasi &lt; {requiredDuration} menit
             </span>
           </div>
 
@@ -240,7 +240,7 @@ export function SlotPicker({
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-amber-800 dark:text-amber-200">
-                Slot alternatif memiliki durasi lebih singkat ({alternativeDuration || requiredDuration - 10} menit). Pastikan waktu cukup untuk seminar.
+                Slot alternatif memiliki durasi lebih singkat (&lt; {requiredDuration} menit). Pastikan waktu luang yang tersedia (tertera pada setiap slot) cukup untuk menyelesaikan seminar.
               </p>
             </div>
           </div>
