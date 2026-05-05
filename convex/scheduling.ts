@@ -50,9 +50,12 @@ const GLOBAL_BREAKS = [
 const DAYS_OF_WEEK = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
 // Convert time string (HH:mm) to minutes from midnight
-function timeToMinutes(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
+function timeToMinutes(timeStr: string): number {
+  if (!timeStr) return 0;
+  // Format string from "09.20" to "09:20" to handle both formats from CSV
+  const normalizedStr = timeStr.replace('.', ':');
+  const [hours, minutes] = normalizedStr.split(':').map(Number);
+  return hours * 60 + (minutes || 0);
 }
 
 // Convert minutes from midnight to time string (HH:mm)
