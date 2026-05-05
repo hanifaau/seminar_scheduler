@@ -118,6 +118,7 @@ export default function JadwalSeminarPage() {
 
   // Mutations & Actions
   const scheduleSeminar = useMutation(api.scheduling.scheduleSeminar);
+  const cancelSchedule = useMutation(api.seminar_requests.cancelSchedule);
   const sendSeminarNotifications = useAction(api.notifications.sendSeminarNotifications);
 
   const handleSelectRequest = (request: SeminarRequest) => {
@@ -141,6 +142,25 @@ export default function JadwalSeminarPage() {
 
   const handleCheckPrevWeek = () => {
     setWeekOffset((prev) => Math.max(0, prev - 1));
+  };
+
+  const [cancelingId, setCancelingId] = React.useState<string | null>(null);
+
+  const handleCancelSchedule = async (requestId: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin membatalkan jadwal ini? Mahasiswa akan dikembalikan ke daftar tunggu penjadwalan.')) {
+      return;
+    }
+    
+    setCancelingId(requestId);
+    try {
+      await cancelSchedule({ id: requestId as any });
+      toast.success('Jadwal berhasil dibatalkan');
+    } catch (error: any) {
+      console.error('Cancel schedule error:', error);
+      toast.error(`Gagal membatalkan jadwal: ${error.message}`);
+    } finally {
+      setCancelingId(null);
+    }
   };
 
   const handleSendReminder = async (requestId: string) => {
@@ -417,25 +437,47 @@ export default function JadwalSeminarPage() {
                       </div>
                     </div>
 
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
-                      onClick={() => handleSendReminder(request._id as string)}
-                      disabled={sendingReminderId === request._id}
-                    >
-                      {sendingReminderId === request._id ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> 
-                          Mengirim Reminder...
-                        </>
-                      ) : (
-                        <>
-                          <MessageSquare className="h-3.5 w-3.5 mr-2" /> 
-                          Kirim Reminder WhatsApp
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+                        onClick={() => handleSendReminder(request._id as string)}
+                        disabled={sendingReminderId === request._id || cancelingId === request._id}
+                      >
+                        {sendingReminderId === request._id ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> 
+                            Mengirim Reminder...
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquare className="h-3.5 w-3.5 mr-2" /> 
+                            Kirim Reminder WhatsApp
+                          </>
+                        )}
+                      </Button>
+                      
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+                        onClick={() => handleCancelSchedule(request._id as string)}
+                        disabled={cancelingId === request._id || sendingReminderId === request._id}
+                      >
+                        {cancelingId === request._id ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> 
+                            Membatalkan...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-3.5 w-3.5 mr-2" /> 
+                            Batalkan Jadwal
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
