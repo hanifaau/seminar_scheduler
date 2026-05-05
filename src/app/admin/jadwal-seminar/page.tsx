@@ -481,7 +481,14 @@ export default function JadwalSeminarPage() {
                 <div className="flex flex-wrap gap-2 text-xs">
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <Users className="h-3 w-3" />
-                    <span>4 Dosen terlibat</span>
+                    <span>
+                      {[
+                        selectedRequest.supervisor1Id,
+                        selectedRequest.supervisor2Id,
+                        selectedRequest.examiner1Id,
+                        selectedRequest.examiner2Id
+                      ].filter(Boolean).length} Dosen terlibat
+                    </span>
                   </div>
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <Clock className="h-3 w-3" />
