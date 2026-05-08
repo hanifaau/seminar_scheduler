@@ -48,7 +48,7 @@ function TableRowSkeleton() {
 }
 
 // CSV Parser untuk Dosen (Simplified: Index, Nama, NIP only)
-function parseDosenCSV(file: File): Promise<{ nama: string; nip: string }[]> {
+function parseDosenCSV(file: File): Promise<{ nama: string; nip: string; phone?: string }[]> {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
@@ -58,6 +58,7 @@ function parseDosenCSV(file: File): Promise<{ nama: string; nip: string }[]> {
         if (h.includes('nama')) return 'nama';
         // Hanya tangkap NIP, NIDN, NIK, atau kata "induk"
         if (h === 'nip' || h === 'nidn' || h === 'nik' || h.includes('induk')) return 'nip';
+        if (h.includes('hp') || h.includes('telepon') || h.includes('phone')) return 'phone';
         return h;
       },
       complete: (results) => {
@@ -67,6 +68,7 @@ function parseDosenCSV(file: File): Promise<{ nama: string; nip: string }[]> {
           .map((row) => ({
             nama: row.nama.trim(),
             nip: row.nip.trim(),
+            phone: row.phone?.trim(),
           }));
         resolve(dosens);
       },
@@ -79,11 +81,11 @@ function parseDosenCSV(file: File): Promise<{ nama: string; nip: string }[]> {
 
 // Generate sample CSV (Simplified)
 function generateSampleDosenCSV(): string {
-  const headers = ['Index', 'Nama', 'NIP'];
+  const headers = ['Index', 'Nama', 'NIP', 'No HP'];
   const sampleData = [
-    ['1', 'Dr. Ahmad Fauzi, M.T.', '198001011990011001'],
-    ['2', 'Prof. Siti Rahma, Ph.D.', '197505021998022002'],
-    ['3', 'Ir. Budi Santoso, M.Eng.', '198203032005031003'],
+    ['1', 'Dr. Ahmad Fauzi, M.T.', '198001011990011001', '081234567890'],
+    ['2', 'Prof. Siti Rahma, Ph.D.', '197505021998022002', '082345678901'],
+    ['3', 'Ir. Budi Santoso, M.Eng.', '198203032005031003', ''],
   ];
   const csvContent = [
     headers.join(','),
@@ -98,7 +100,7 @@ export default function ManajemenDosenPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = React.useState(false);
   const [editingDosen, setEditingDosen] = React.useState<Lecturer | null>(null);
-  const [csvData, setCSVData] = React.useState<{ nama: string; nip: string }[]>([]);
+  const [csvData, setCSVData] = React.useState<{ nama: string; nip: string; phone?: string }[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
 
   // Form state
@@ -227,6 +229,7 @@ export default function ManajemenDosenPage() {
           await createLecturer({
             name: dosen.nama,
             nip: dosen.nip,
+            phone: dosen.phone || undefined,
             status: 'active',
           });
           successCount++;
