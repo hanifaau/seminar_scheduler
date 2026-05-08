@@ -590,7 +590,7 @@ export default function ManajemenDosenPage() {
                   <div className="border-2 border-dashed rounded-lg p-6 text-center">
                     <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                     <p className="text-sm text-muted-foreground mb-3">
-                      Format kolom: <strong>Index, Nama, NIP</strong>
+                      Format kolom: <strong>Index, Nama, NIP, No HP</strong>
                     </p>
                     <p className="text-xs text-muted-foreground mb-3">
                       Kepakaran dapat diatur kemudian melalui menu "Atur Kepakaran"
