@@ -349,13 +349,14 @@ export const importFromMinimalistCSV = mutation({
       lecturerIdMap.set(lecturer._id.toString(), lecturer);
     }
 
-    // Get all existing schedules to check for duplicates
+    // Hapus semua jadwal yang sudah ada (Sistem Tiban/Ganti Total)
     const existingSchedules = await ctx.db.query('teaching_schedules').collect();
-    const scheduleKeys = new Set<string>();
     for (const schedule of existingSchedules) {
-      const key = `${schedule.lecturerId}-${schedule.day}-${schedule.startTime}-${schedule.endTime}`;
-      scheduleKeys.add(key);
+      await ctx.db.delete(schedule._id);
     }
+    
+    // Set ini tetap digunakan untuk mencegah duplikat di dalam CSV yang sama
+    const scheduleKeys = new Set<string>();
 
     const parseLecturerKeywords = (names: string) =>
       names

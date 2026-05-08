@@ -98,6 +98,7 @@ export default function UnggahJadwalPage() {
 
   // Queries
   const courses = useQuery(api.courses.getAll);
+  const existingSchedules = useQuery(api.teaching_schedules.getAllWithLecturer);
 
   // Mutations
   const importFromMinimalistCSV = useMutation(api.teaching_schedules.importFromMinimalistCSV);
@@ -502,7 +503,7 @@ export default function UnggahJadwalPage() {
 
       {/* Upload Result */}
       {uploadResult && (
-        <div className="space-y-4">
+        <div className="space-y-4 mb-12">
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30 p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
@@ -525,7 +526,7 @@ export default function UnggahJadwalPage() {
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                   {uploadResult.lecturersLinked}
                 </p>
-                <p className="text-xs text-muted-foreground">Jadwal dosen dibuat</p>
+                <p className="text-xs text-muted-foreground">Jadwal dosen terhubung</p>
               </div>
             </div>
 
@@ -561,14 +562,75 @@ export default function UnggahJadwalPage() {
 
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setUploadResult(null)}>
-              Upload Lagi
+              Tutup Hasil
             </Button>
-            <Link href="/admin/courses">
-              <Button>Lihat Master MK</Button>
-            </Link>
           </div>
         </div>
       )}
+
+      {/* Existing Schedules Table */}
+      <div className="mt-12 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Jadwal Kuliah Tersimpan ({existingSchedules?.length || 0})</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Berikut adalah jadwal kuliah yang saat ini aktif dan digunakan sistem untuk kalkulasi penjadwalan seminar.
+        </p>
+
+        <div className="rounded-lg border overflow-hidden">
+          <div className="overflow-x-auto max-h-[500px]">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-foreground">Dosen</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground">Hari</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground">Waktu</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground">Mata Kuliah / Aktivitas</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground">Ruang</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {existingSchedules === undefined ? (
+                  [...Array(5)].map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-4 py-3"><Skeleton className="h-4 w-32" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-4 w-20" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-4 w-24" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-4 w-40" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-4 w-16" /></td>
+                    </tr>
+                  ))
+                ) : existingSchedules.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                      <FileText className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                      Belum ada jadwal yang diunggah
+                    </td>
+                  </tr>
+                ) : (
+                  existingSchedules.map((schedule) => (
+                    <tr key={schedule._id} className="hover:bg-muted/50 transition-colors bg-background">
+                      <td className="px-4 py-3 font-medium">
+                        {schedule.lecturer?.name || 'Dosen Tidak Ditemukan'}
+                      </td>
+                      <td className="px-4 py-3">{schedule.day}</td>
+                      <td className="px-4 py-3 font-mono text-xs">
+                        {schedule.startTime} - {schedule.endTime}
+                      </td>
+                      <td className="px-4 py-3">
+                        {schedule.activity || schedule.course?.name || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {schedule.room || '-'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
