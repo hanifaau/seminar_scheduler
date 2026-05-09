@@ -244,3 +244,62 @@ export const seed = mutation({
     return { message: 'Mata kuliah berhasil ditambahkan', count: insertedIds.length };
   },
 });
+
+// Bulk import courses from CSV
+export const bulkImport = mutation({
+  args: {
+    courses: v.array(
+      v.object({
+        code: v.string(),
+        name: v.string(),
+        sks: v.number(),
+        semester: v.optional(v.number()),
+        lecturerIds: v.array(v.id('lecturers')),
+        action: v.union(v.literal('create'), v.literal('update')),
+        existingId: v.optional(v.id('courses')),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    for (const course of args.courses) {
+      if (course.action === 'create') {
+        // Double check for duplicate before insert
+        const existing = await ctx.db
+          .query('courses')
+          .withIndex('by_code', (q) => q.eq('code', course.code))
+          .first();
+
+        if (!existing) {
+          await ctx.db.insert('courses', {
+            code: course.code,
+            name: course.name,
+            sks: course.sks,
+            semester: course.semester,
+            lecturerIds: course.lecturerIds,
+            createdAt: now,
+          });
+          createdCount++;
+        }
+      } else if (course.action === 'update' && course.existingId) {
+        // Update existing course
+        const existing = await ctx.db.get(course.existingId);
+        if (existing) {
+          await ctx.db.patch(course.existingId, {
+            name: course.name,
+            sks: course.sks,
+            semester: course.semester,
+            lecturerIds: course.lecturerIds,
+            updatedAt: now,
+          });
+          updatedCount++;
+        }
+      }
+    }
+
+    return { createdCount, updatedCount };
+  },
+});
