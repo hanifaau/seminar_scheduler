@@ -17,8 +17,8 @@ import {
   Download,
   FileText,
   AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
-import Papa from 'papaparse';
 import { toast } from 'sonner';
 import { api } from 'convex/_generated/api';
 import { Button } from '@/components/atoms/Button';
@@ -44,59 +44,15 @@ interface Course {
   lecturers?: Lecturer[];
 }
 
-interface ParsedCourseRow {
-  code: string;
-  name: string;
-  sks: number;
-  semester: number;
-  lecturersStr: string;
-}
-
-export type CSVPreviewRow = {
-  action: 'create' | 'update' | 'invalid';
-  existingId?: string;
-  course: ParsedCourseRow;
-  lecturerIds: string[];
-  matchedLecturerNames: string[];
-  invalidReason?: string;
-};
-
-// Generate sample CSV for courses
-function generateSampleCourseCSV(): string {
-  const headers = ['Kode MK', 'Nama Mata Kuliah', 'SKS', 'Semester', 'Dosen Pengampu'];
-  const sampleData = [
-    ['TIN62107', 'Kalkulus II', '4', '2', 'Ahmad Syafruddin, Difana Meilani'],
-    ['TIN62142', 'Menggambar Teknik', '2', '2', 'Alfadhani, Yumi Meuthia'],
-    ['TIN12345', 'Mata Kuliah Baru', '', '', 'Taufik'], // SKS and Semester are optional
-  ];
-  const csvContent = [
-    headers.join(','),
-    ...sampleData.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-  ].join('\n');
-  return csvContent;
-}
-
-// Parse Lecturer Keywords (split by comma)
-function parseLecturerKeywords(lecturersStr: string): string[] {
-  if (!lecturersStr) return [];
-  return lecturersStr
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
-
 export default function MasterCoursesPage() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = React.useState(false);
   const [editingCourse, setEditingCourse] = React.useState<Course | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isSeeding, setIsSeeding] = React.useState(false);
-  
-  // CSV Upload state
-  const [csvPreview, setCsvPreview] = React.useState<CSVPreviewRow[]>([]);
-  const [isUploading, setIsUploading] = React.useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = React.useState(false);
+  const [isResetting, setIsResetting] = React.useState(false);
 
   // Form state
   const [formData, setFormData] = React.useState({
@@ -120,7 +76,7 @@ export default function MasterCoursesPage() {
   const updateCourse = useMutation(api.courses.update);
   const deleteCourse = useMutation(api.courses.remove);
   const seedCourses = useMutation(api.courses.seed);
-  const bulkImportCourses = useMutation(api.courses.bulkImport);
+  const resetLecturers = useMutation(api.courses.removeAllLecturers);
 
   // Filter courses by search
   const filteredCourses = React.useMemo(() => {
@@ -134,17 +90,29 @@ export default function MasterCoursesPage() {
     );
   }, [courses, searchQuery]);
 
-  // Filter lecturers by search
+  // Filter lecturers by search and sort selected to top
   const filteredLecturers = React.useMemo(() => {
     if (!lecturers) return [];
-    if (!lecturerSearch) return lecturers;
-
-    return lecturers.filter(
-      (l) =>
-        l.name.toLowerCase().includes(lecturerSearch.toLowerCase()) ||
-        l.nip.includes(lecturerSearch)
-    );
-  }, [lecturers, lecturerSearch]);
+    
+    let filtered = lecturers;
+    if (lecturerSearch) {
+      filtered = lecturers.filter(
+        (l) =>
+          l.name.toLowerCase().includes(lecturerSearch.toLowerCase()) ||
+          l.nip.includes(lecturerSearch)
+      );
+    }
+    
+    // Sort logic: Selected lecturers at the top, then alphabetically
+    return [...filtered].sort((a, b) => {
+      const aSelected = formData.lecturerIds.includes(a._id);
+      const bSelected = formData.lecturerIds.includes(b._id);
+      
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [lecturers, lecturerSearch, formData.lecturerIds]);
 
   // Toggle lecturer selection
   const toggleLecturer = (lecturerId: string) => {
@@ -267,153 +235,16 @@ export default function MasterCoursesPage() {
     }
   };
 
-  const downloadCSVTemplate = () => {
-    const csvContent = generateSampleCourseCSV();
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'template_master_mk.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !lecturers || !courses) return;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header) => {
-        const h = header.toLowerCase().trim();
-        if (h.includes('kode')) return 'code';
-        if (h.includes('nama')) return 'name';
-        if (h.includes('sks')) return 'sks';
-        if (h.includes('semester')) return 'semester';
-        if (h.includes('dosen')) return 'lecturersStr';
-        return h;
-      },
-      complete: (results) => {
-        const data = results.data as Record<string, string>[];
-        const previewRows: CSVPreviewRow[] = [];
-
-        for (const row of data) {
-          if (!row.code || !row.name || !row.lecturersStr) continue;
-
-          const parsedRow: ParsedCourseRow = {
-            code: row.code.trim(),
-            name: row.name.trim(),
-            sks: parseInt(row.sks) || 0,
-            semester: parseInt(row.semester) || 0,
-            lecturersStr: row.lecturersStr,
-          };
-
-          // Map lecturers
-          const keywords = parseLecturerKeywords(parsedRow.lecturersStr);
-          const matchedLecturerIds: string[] = [];
-          const matchedLecturerNames: string[] = [];
-          let invalidReason = '';
-
-          for (const keyword of keywords) {
-            const matches = lecturers.filter((l) =>
-              l.name.toLowerCase().includes(keyword.toLowerCase())
-            );
-
-            if (matches.length === 0) {
-              invalidReason = `Dosen "${keyword}" tidak ditemukan.`;
-              break;
-            } else if (matches.length > 1) {
-              invalidReason = `Dosen "${keyword}" ambigu (ditemukan ${matches.length} dosen). Harap lebih spesifik.`;
-              break;
-            } else {
-              matchedLecturerIds.push(matches[0]._id);
-              matchedLecturerNames.push(matches[0].name);
-            }
-          }
-
-          if (invalidReason) {
-            previewRows.push({
-              action: 'invalid',
-              course: parsedRow,
-              lecturerIds: [],
-              matchedLecturerNames: [],
-              invalidReason,
-            });
-            continue;
-          }
-
-          // Check if course already exists
-          const existingCourse = courses.find((c) => c.code.toLowerCase() === parsedRow.code.toLowerCase());
-          
-          if (existingCourse) {
-            // Check if lecturer IDs changed
-            const currentIds = [...existingCourse.lecturerIds].sort();
-            const newIds = [...matchedLecturerIds].sort();
-            const isDifferent = currentIds.length !== newIds.length || !currentIds.every((v, i) => v === newIds[i]);
-            
-            if (isDifferent) {
-              previewRows.push({
-                action: 'update',
-                existingId: existingCourse._id,
-                course: parsedRow,
-                lecturerIds: matchedLecturerIds,
-                matchedLecturerNames,
-              });
-            } else {
-              previewRows.push({
-                action: 'invalid',
-                course: parsedRow,
-                lecturerIds: matchedLecturerIds,
-                matchedLecturerNames,
-                invalidReason: 'Mata kuliah sudah ada dan tim dosen persis sama (Tidak ada perubahan)',
-              });
-            }
-          } else {
-            previewRows.push({
-              action: 'create',
-              course: parsedRow,
-              lecturerIds: matchedLecturerIds,
-              matchedLecturerNames,
-            });
-          }
-        }
-
-        setCsvPreview(previewRows);
-      },
-      error: (error) => {
-        toast.error(`Gagal membaca CSV: ${error.message}`);
-      },
-    });
-  };
-
-  const handleBulkUpload = async () => {
-    const validRows = csvPreview.filter((row) => row.action !== 'invalid');
-    if (validRows.length === 0) return;
-
-    setIsUploading(true);
+  const handleResetLecturers = async () => {
+    setIsResetting(true);
     try {
-      const result = await bulkImportCourses({
-        courses: validRows.map(row => ({
-          code: row.course.code,
-          name: row.course.name,
-          sks: row.course.sks,
-          semester: row.course.semester || undefined,
-          lecturerIds: row.lecturerIds as any[],
-          action: row.action as 'create' | 'update',
-          existingId: row.existingId as any,
-        }))
-      });
-
-      toast.success(`Berhasil! ${result.createdCount} ditambahkan, ${result.updatedCount} diperbarui.`);
-      setIsUploadDialogOpen(false);
-      setCsvPreview([]);
+      const result = await resetLecturers();
+      toast.success(`${result} mata kuliah berhasil di-reset dosen pengampunya`);
+      setIsResetDialogOpen(false);
     } catch (error: any) {
-      toast.error(error.message || 'Gagal mengunggah data CSV');
+      toast.error(error.message || 'Gagal mereset dosen pengampu');
     } finally {
-      setIsUploading(false);
+      setIsResetting(false);
     }
   };
 
@@ -440,9 +271,9 @@ export default function MasterCoursesPage() {
               Tambah Default
             </Button>
           )}
-          <Button variant="outline" onClick={() => setIsUploadDialogOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            Unggah CSV
+          <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200" onClick={() => setIsResetDialogOpen(true)}>
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Reset Dosen
           </Button>
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
@@ -741,166 +572,43 @@ export default function MasterCoursesPage() {
           </div>
         </div>
       )}
-      {/* Upload CSV Dialog */}
-      {isUploadDialogOpen && (
+      {/* Reset Confirmation Dialog */}
+      {isResetDialogOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-semibold text-foreground">Unggah Master Mata Kuliah CSV</h2>
-              <Button variant="ghost" size="icon" onClick={() => {
-                setIsUploadDialogOpen(false);
-                setCsvPreview([]);
-              }}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="space-y-6">
-              {!csvPreview.length ? (
-                <>
-                  <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                    <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Format kolom: <strong>Kode MK, Nama Mata Kuliah, Dosen Pengampu, SKS, Semester</strong>
-                    </p>
-                    <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto">
-                      Dosen pengampu bisa dipisah koma (contoh: "Ahmad Inca, Budi"). 
-                      SKS dan Semester bersifat opsional.
-                    </p>
-                    <div className="flex justify-center gap-4 mt-4">
-                      <Button variant="outline" onClick={downloadCSVTemplate}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Unduh Template
-                      </Button>
-                      <div className="relative">
-                        <Input
-                          type="file"
-                          accept=".csv"
-                          onChange={handleFileUpload}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        <Button>
-                          <Upload className="h-4 w-4 mr-2" />
-                          Pilih File CSV
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-semibold text-sm">Pratinjau Hasil Impor</h3>
-                    <div className="flex gap-2">
-                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                        {csvPreview.filter(r => r.action === 'create').length} Baru
-                      </Badge>
-                      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                        {csvPreview.filter(r => r.action === 'update').length} Diperbarui
-                      </Badge>
-                      <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                        {csvPreview.filter(r => r.action === 'invalid').length} Invalid
-                      </Badge>
-                    </div>
-                  </div>
-
-                  <div className="border rounded-md overflow-hidden">
-                    <div className="overflow-x-auto max-h-[50vh]">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted sticky top-0">
-                          <tr>
-                            <th className="px-3 py-2 text-left">Status</th>
-                            <th className="px-3 py-2 text-left">Kode</th>
-                            <th className="px-3 py-2 text-left">Mata Kuliah</th>
-                            <th className="px-3 py-2 text-left">SKS</th>
-                            <th className="px-3 py-2 text-left">Semester</th>
-                            <th className="px-3 py-2 text-left">Dosen Pengampu</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {csvPreview.map((row, i) => (
-                            <tr key={i} className={cn(
-                              row.action === 'invalid' && "bg-red-50/50 dark:bg-red-950/20",
-                              row.action === 'update' && "bg-blue-50/30 dark:bg-blue-950/10",
-                              row.action === 'create' && "bg-green-50/30 dark:bg-green-950/10"
-                            )}>
-                              <td className="px-3 py-2">
-                                {row.action === 'invalid' ? (
-                                  <Badge variant="destructive" className="flex gap-1 w-max">
-                                    <AlertCircle className="h-3 w-3" /> Error
-                                  </Badge>
-                                ) : row.action === 'update' ? (
-                                  <Badge variant="outline" className="text-blue-600 border-blue-300 w-max">
-                                    Diperbarui
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-green-600 border-green-300 w-max">
-                                    Baru
-                                  </Badge>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 font-mono">{row.course.code}</td>
-                              <td className="px-3 py-2">{row.course.name}</td>
-                              <td className="px-3 py-2">{row.course.sks || '-'}</td>
-                              <td className="px-3 py-2">{row.course.semester || '-'}</td>
-                              <td className="px-3 py-2">
-                                {row.action === 'invalid' ? (
-                                  <span className="text-red-500 text-xs">{row.invalidReason}</span>
-                                ) : (
-                                  <div className="flex flex-col gap-1">
-                                    <span className="text-xs text-muted-foreground line-clamp-2">
-                                      Raw: {row.course.lecturersStr}
-                                    </span>
-                                    {row.matchedLecturerNames.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {row.matchedLecturerNames.map((name, i) => (
-                                          <Badge key={i} variant="secondary" className="text-[10px] font-normal">
-                                            {name}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              )}
+          <div className="bg-card rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <AlertTriangle className="h-6 w-6" />
+              <h2 className="text-lg font-semibold">Konfirmasi Reset Dosen</h2>
             </div>
             
-            <div className="flex justify-end gap-3 mt-6">
+            <p className="text-muted-foreground mb-6">
+              Apakah Anda yakin ingin menghapus <strong>seluruh dosen pengampu</strong> dari semua mata kuliah? 
+              Tindakan ini tidak dapat dibatalkan.
+            </p>
+
+            <div className="flex justify-end gap-3">
               <Button
                 variant="outline"
-                onClick={() => {
-                  if (csvPreview.length > 0) {
-                    setCsvPreview([]); // Reset to select another file
-                  } else {
-                    setIsUploadDialogOpen(false);
-                  }
-                }}
+                onClick={() => setIsResetDialogOpen(false)}
+                disabled={isResetting}
               >
-                {csvPreview.length > 0 ? 'Pilih File Lain' : 'Batal'}
+                Batal
               </Button>
-              {csvPreview.length > 0 && (
-                <Button 
-                  onClick={handleBulkUpload} 
-                  disabled={isUploading || csvPreview.every(r => r.action === 'invalid')}
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Memproses...
-                    </>
-                  ) : (
-                    'Impor Data Valid'
-                  )}
-                </Button>
-              )}
+              <Button 
+                variant="destructive"
+                onClick={handleResetLecturers} 
+                disabled={isResetting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isResetting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Mereset...
+                  </>
+                ) : (
+                  'Ya, Hapus Semua'
+                )}
+              </Button>
             </div>
           </div>
         </div>

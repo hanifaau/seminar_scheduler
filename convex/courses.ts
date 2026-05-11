@@ -303,3 +303,21 @@ export const bulkImport = mutation({
     return { createdCount, updatedCount };
   },
 });
+
+// Remove all lecturers from all courses (Reset Dosen)
+export const removeAllLecturers = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const allCourses = await ctx.db.query('courses').collect();
+    let updatedCount = 0;
+    
+    for (const course of allCourses) {
+      if (course.lecturerIds && course.lecturerIds.length > 0) {
+        await ctx.db.patch(course._id, { lecturerIds: [] });
+        updatedCount++;
+      }
+    }
+    
+    return updatedCount;
+  },
+});
