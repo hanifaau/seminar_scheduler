@@ -57,7 +57,6 @@ const STATUS_OPTIONS = [
 interface StaffMember {
   _id: string;
   name: string;
-  idPegawai: string;
   nip?: string;
   role: string;
   status?: string;
@@ -72,7 +71,6 @@ export default function StaffManagementPage() {
   // Form state
   const [formData, setFormData] = React.useState({
     name: '',
-    idPegawai: '',
     nip: '',
     role: 'admin_akademik' as string,
   });
@@ -94,7 +92,6 @@ export default function StaffManagementPage() {
       const matchesSearch =
         searchQuery === '' ||
         s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.idPegawai.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (s.nip && s.nip.includes(searchQuery));
 
       return matchesSearch;
@@ -102,7 +99,7 @@ export default function StaffManagementPage() {
   }, [staff, searchQuery]);
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.idPegawai || !formData.role) {
+    if (!formData.name || !formData.role) {
       toast.error('Mohon lengkapi semua field yang wajib diisi');
       return;
     }
@@ -113,7 +110,6 @@ export default function StaffManagementPage() {
         await updateStaff({
           id: editingStaff._id as any,
           name: formData.name,
-          idPegawai: formData.idPegawai,
           nip: formData.nip || undefined,
           role: formData.role as any,
         });
@@ -121,7 +117,6 @@ export default function StaffManagementPage() {
       } else {
         await createStaff({
           name: formData.name,
-          idPegawai: formData.idPegawai,
           nip: formData.nip || undefined,
           role: formData.role as any,
         });
@@ -130,7 +125,6 @@ export default function StaffManagementPage() {
 
       setFormData({
         name: '',
-        idPegawai: '',
         nip: '',
         role: 'admin_akademik',
       });
@@ -147,7 +141,6 @@ export default function StaffManagementPage() {
     setEditingStaff(staffMember);
     setFormData({
       name: staffMember.name,
-      idPegawai: staffMember.idPegawai,
       nip: staffMember.nip || '',
       role: staffMember.role,
     });
@@ -169,7 +162,6 @@ export default function StaffManagementPage() {
     setEditingStaff(null);
     setFormData({
       name: '',
-      idPegawai: '',
       nip: '',
       role: 'admin_akademik',
     });
@@ -198,7 +190,7 @@ export default function StaffManagementPage() {
       <div className="relative w-full sm:w-80">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Cari nama atau ID pegawai..."
+          placeholder="Cari nama pegawai..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-9"
@@ -212,7 +204,6 @@ export default function StaffManagementPage() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left font-medium text-foreground">Nama</th>
-                <th className="px-4 py-3 text-left font-medium text-foreground">ID Pegawai</th>
                 <th className="px-4 py-3 text-left font-medium text-foreground">NIP</th>
                 <th className="px-4 py-3 text-left font-medium text-foreground">Jabatan</th>
                 <th className="px-4 py-3 text-left font-medium text-foreground">Status</th>
@@ -246,7 +237,6 @@ export default function StaffManagementPage() {
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="px-4 py-3 text-left font-medium text-foreground">Nama</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">ID Pegawai</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground">NIP</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground">Jabatan</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground">Status</th>
@@ -260,9 +250,6 @@ export default function StaffManagementPage() {
                   return (
                     <tr key={staffMember._id} className="border-b hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">{staffMember.name}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {staffMember.idPegawai}
-                      </td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                         {staffMember.nip || '-'}
                       </td>
@@ -319,15 +306,6 @@ export default function StaffManagementPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Masukkan nama lengkap"
-                />
-              </div>
-              <div>
-                <Label htmlFor="idPegawai">ID Pegawai *</Label>
-                <Input
-                  id="idPegawai"
-                  value={formData.idPegawai}
-                  onChange={(e) => setFormData({ ...formData, idPegawai: e.target.value })}
-                  placeholder="Contoh: PEG-001"
                 />
               </div>
               <div>

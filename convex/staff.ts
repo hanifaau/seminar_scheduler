@@ -30,7 +30,6 @@ export const getActive = query({
 export const create = mutation({
   args: {
     name: v.string(),
-    idPegawai: v.string(),
     nip: v.optional(v.string()),
     role: v.union(
       v.literal('admin_akademik'),
@@ -40,20 +39,9 @@ export const create = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    // Check if idPegawai already exists
-    const existing = await ctx.db
-      .query('staff')
-      .withIndex('by_idPegawai', (q) => q.eq('idPegawai', args.idPegawai))
-      .first();
-
-    if (existing) {
-      throw new Error('ID Pegawai sudah terdaftar');
-    }
-
     const now = Date.now();
     const staffId = await ctx.db.insert('staff', {
       name: args.name,
-      idPegawai: args.idPegawai,
       nip: args.nip,
       role: args.role,
       status: 'active',
@@ -68,7 +56,6 @@ export const update = mutation({
   args: {
     id: v.id('staff'),
     name: v.optional(v.string()),
-    idPegawai: v.optional(v.string()),
     nip: v.optional(v.string()),
     role: v.optional(v.union(
       v.literal('admin_akademik'),
@@ -83,17 +70,6 @@ export const update = mutation({
     const existing = await ctx.db.get(id);
     if (!existing) {
       throw new Error('Pegawai tidak ditemukan');
-    }
-
-    // Check if new idPegawai conflicts with another staff
-    if (updates.idPegawai && updates.idPegawai !== existing.idPegawai) {
-      const conflict = await ctx.db
-        .query('staff')
-        .withIndex('by_idPegawai', (q) => q.eq('idPegawai', updates.idPegawai!))
-        .first();
-      if (conflict) {
-        throw new Error('ID Pegawai sudah digunakan oleh pegawai lain');
-      }
     }
 
     const updateData: Record<string, unknown> = {
@@ -135,16 +111,6 @@ export const getByNip = query({
   },
 });
 
-// Get staff by ID Pegawai
-export const getByIdPegawai = query({
-  args: { idPegawai: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query('staff')
-      .withIndex('by_idPegawai', (q) => q.eq('idPegawai', args.idPegawai))
-      .first();
-  },
-});
 
 // Get staff by role
 export const getByRole = query({
@@ -177,7 +143,6 @@ export const search = query({
     return allStaff.filter(
       (staff) =>
         staff.name.toLowerCase().includes(searchQuery) ||
-        staff.idPegawai.toLowerCase().includes(searchQuery) ||
         (staff.nip && staff.nip.includes(searchQuery))
     );
   },

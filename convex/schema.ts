@@ -35,7 +35,6 @@ export default defineSchema({
   // Staff table - stores administrative staff information
   staff: defineTable({
     name: v.string(),
-    idPegawai: v.string(), // Employee ID
     nip: v.optional(v.string()), // NIP (optional for non-civil servant)
     role: v.union(
       v.literal('admin_akademik'),  // Academic Admin
@@ -48,7 +47,6 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
   })
     .index('by_nip', ['nip'])
-    .index('by_idPegawai', ['idPegawai'])
     .index('by_role', ['role']),
 
   // Courses table - stores course information (Master Mata Kuliah)
