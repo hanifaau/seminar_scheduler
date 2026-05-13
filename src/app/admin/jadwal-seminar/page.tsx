@@ -420,6 +420,38 @@ export default function JadwalSeminarPage() {
                     </div>
                     <p className="text-sm text-foreground line-clamp-2 mb-3">{request.title}</p>
 
+                    <div className="space-y-1.5 text-xs mb-3">
+                      {/* Supervisors */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-muted-foreground min-w-[70px]">Pembimbing:</span>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="secondary" className="text-[10px]">
+                            {request.supervisor1?.name || '-'}
+                          </Badge>
+                          {request.supervisor2 && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {request.supervisor2.name}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Examiners */}
+                      <div className="flex items-start gap-2">
+                        <span className="text-muted-foreground min-w-[70px]">Penguji:</span>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant="info" className="text-[10px]">
+                            {request.examiner1?.name || '-'}
+                          </Badge>
+                          {request.examiner2 && (
+                            <Badge variant="info" className="text-[10px]">
+                              {request.examiner2.name}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="rounded bg-muted/50 p-3 mb-4 text-xs space-y-2">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-3.5 w-3.5 text-primary" />
