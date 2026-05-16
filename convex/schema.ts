@@ -64,6 +64,7 @@ export default defineSchema({
   teaching_schedules: defineTable({
     lecturerId: v.id('lecturers'),
     groupId: v.optional(v.id('schedule_groups')), // Reference to schedule group
+    courseId: v.optional(v.any()), // Legacy field: retained as optional to prevent validation errors on old data
     day: v.string(), // e.g., "Senin", "Selasa", etc.
     shiftId: v.optional(v.string()), // e.g., "2sks-1", "3sks-2"
     startTime: v.string(), // e.g., "07:30"
