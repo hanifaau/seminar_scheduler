@@ -23,6 +23,7 @@ export default function ScheduleGroupsPage() {
 
   // Queries
   const groups = useQuery(api.teaching_schedules.getGroups);
+  const allSchedules = useQuery(api.teaching_schedules.getAllWithLecturer);
 
   // Mutations
   const createGroup = useMutation(api.teaching_schedules.createGroup);
@@ -248,10 +249,74 @@ export default function ScheduleGroupsPage() {
                 onClick={() => handleToggleActive(group._id, group.isActive)}
               >
                 <Power className="h-4 w-4 mr-2" />
-                {group.isActive ? 'Matalkan Aktif' : 'Aktifkan Jadwal'}
+                {group.isActive ? 'Batalkan Aktif' : 'Aktifkan Jadwal'}
               </Button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Tabel Jadwal Aktif */}
+      {groups !== undefined && allSchedules !== undefined && (
+        <div className="mt-12 space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-xl font-bold text-foreground">Daftar Jadwal Aktif</h2>
+            <Badge className="bg-emerald-500">
+              {groups.filter(g => g.isActive).length} Grup
+            </Badge>
+          </div>
+
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-muted/50 text-muted-foreground font-medium border-b">
+                  <tr>
+                    <th className="px-4 py-3">Hari</th>
+                    <th className="px-4 py-3">Waktu</th>
+                    <th className="px-4 py-3">Mata Kuliah / Aktivitas</th>
+                    <th className="px-4 py-3">Dosen</th>
+                    <th className="px-4 py-3">Ruang</th>
+                    <th className="px-4 py-3">Grup Jadwal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {(() => {
+                    const activeGroupsIds = groups.filter((g) => g.isActive).map((g) => g._id);
+                    const activeSchedules = allSchedules.filter((s) => s.groupId && activeGroupsIds.includes(s.groupId));
+
+                    if (activeSchedules.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                            Belum ada jadwal yang diaktifkan. Silakan aktifkan grup jadwal di atas.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return activeSchedules.map((schedule) => (
+                      <tr key={schedule._id} className="hover:bg-muted/30">
+                        <td className="px-4 py-3 font-medium">{schedule.day}</td>
+                        <td className="px-4 py-3">
+                          {schedule.startTime} - {schedule.endTime}
+                        </td>
+                        <td className="px-4 py-3">{schedule.activity}</td>
+                        <td className="px-4 py-3">
+                          {schedule.lecturer ? schedule.lecturer.name : <span className="text-muted-foreground italic">Dosen tidak ditemukan</span>}
+                        </td>
+                        <td className="px-4 py-3">{schedule.room || '-'}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant="outline" className="font-normal">
+                            {schedule.group ? schedule.group.name : '-'}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
