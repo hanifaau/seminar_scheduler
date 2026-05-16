@@ -62,13 +62,14 @@ export default defineSchema({
 
   // Legacy Courses table - retained in schema to prevent strict validation deployment errors
   courses: defineTable({
-    code: v.string(), // e.g., "TII311"
-    name: v.string(), // e.g., "Simulasi Sistem"
-    sks: v.number(),
-    semester: v.number(),
-    category: v.optional(v.string()), // e.g., "Wajib", "Pilihan"
-    createdAt: v.number(),
-    updatedAt: v.optional(v.number()),
+    code: v.optional(v.any()), // e.g., "TII311"
+    name: v.optional(v.any()), // e.g., "Simulasi Sistem"
+    sks: v.optional(v.any()),
+    semester: v.optional(v.any()),
+    category: v.optional(v.any()), // e.g., "Wajib", "Pilihan"
+    createdAt: v.optional(v.any()),
+    updatedAt: v.optional(v.any()),
+    lecturerIds: v.optional(v.any()), // residual field
   })
     .index('by_code', ['code'])
     .index('by_name', ['name']),
