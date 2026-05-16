@@ -8,7 +8,6 @@
  * @module
  */
 
-import type * as courses from "../courses.js";
 import type * as expertise_categories from "../expertise_categories.js";
 import type * as lecturers from "../lecturers.js";
 import type * as notifications from "../notifications.js";
@@ -25,7 +24,6 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  courses: typeof courses;
   expertise_categories: typeof expertise_categories;
   lecturers: typeof lecturers;
   notifications: typeof notifications;
