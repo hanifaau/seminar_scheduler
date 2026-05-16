@@ -94,16 +94,25 @@ export const getByStatusWithLecturers = query({
 
     const requestsWithLecturers = await Promise.all(
       requests.map(async (request) => {
-        const supervisor1 = await ctx.db.get(request.supervisor1Id);
-        const supervisor2 = request.supervisor2Id
-          ? await ctx.db.get(request.supervisor2Id)
-          : null;
-        const examiner1 = request.examiner1Id
-          ? await ctx.db.get(request.examiner1Id)
-          : null;
-        const examiner2 = request.examiner2Id
-          ? await ctx.db.get(request.examiner2Id)
-          : null;
+        let supervisor1 = null;
+        try {
+          if (request.supervisor1Id) supervisor1 = await ctx.db.get(request.supervisor1Id);
+        } catch(e) { console.error('Invalid supervisor1Id', request.supervisor1Id); }
+
+        let supervisor2 = null;
+        try {
+          if (request.supervisor2Id) supervisor2 = await ctx.db.get(request.supervisor2Id);
+        } catch(e) { console.error('Invalid supervisor2Id', request.supervisor2Id); }
+
+        let examiner1 = null;
+        try {
+          if (request.examiner1Id) examiner1 = await ctx.db.get(request.examiner1Id);
+        } catch(e) { console.error('Invalid examiner1Id', request.examiner1Id); }
+
+        let examiner2 = null;
+        try {
+          if (request.examiner2Id) examiner2 = await ctx.db.get(request.examiner2Id);
+        } catch(e) { console.error('Invalid examiner2Id', request.examiner2Id); }
 
         return {
           ...request,
