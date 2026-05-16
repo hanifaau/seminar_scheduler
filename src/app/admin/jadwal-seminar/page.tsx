@@ -103,12 +103,12 @@ export default function JadwalSeminarPage() {
   const [isScheduledSuccess, setIsScheduledSuccess] = React.useState(false);
 
   // Tabs and Reminders
-  const [activeTab, setActiveTab] = React.useState<'allocated' | 'scheduled'>('allocated');
+  const [activeTab, setActiveTab] = React.useState<'allocated' | 'waiting_confirmation'>('allocated');
   const [sendingReminderId, setSendingReminderId] = React.useState<string | null>(null);
 
   // Queries
   const allocatedRequests = useQuery(api.seminar_requests.getByStatusWithLecturers, { status: 'allocated' });
-  const scheduledRequests = useQuery(api.seminar_requests.getByStatusWithLecturers, { status: 'scheduled' });
+  const scheduledRequests = useQuery(api.seminar_requests.getByStatusWithLecturers, { status: 'waiting_confirmation' });
   const availableSlots = useQuery(
     api.scheduling.getAvailableSlots,
     selectedRequest
@@ -119,6 +119,8 @@ export default function JadwalSeminarPage() {
   // Mutations & Actions
   const scheduleSeminar = useMutation(api.scheduling.scheduleSeminar);
   const cancelSchedule = useMutation(api.seminar_requests.cancelSchedule);
+  const markAsScheduled = useMutation(api.seminar_requests.markAsScheduled);
+  const requestRevision = useMutation(api.seminar_requests.requestRevision);
   const sendSeminarNotifications = useAction(api.notifications.sendSeminarNotifications);
 
   const handleSelectRequest = (request: SeminarRequest) => {
@@ -166,9 +168,10 @@ export default function JadwalSeminarPage() {
   const handleSendReminder = async (requestId: string) => {
     setSendingReminderId(requestId);
     try {
+      await requestRevision({ id: requestId as any });
       const results = await sendSeminarNotifications({
         seminarRequestId: requestId as any,
-        messageType: 'reminder',
+        messageType: 'revisi',
       });
 
       const successCount = results.results.filter((r: NotificationResult) => r.success).length;
@@ -184,6 +187,15 @@ export default function JadwalSeminarPage() {
       toast.error(`Gagal mengirim reminder: ${error.message}`);
     } finally {
       setSendingReminderId(null);
+    }
+  };
+
+  const handleMarkAsScheduled = async (requestId: string) => {
+    try {
+      await markAsScheduled({ id: requestId as any });
+      toast.success('Status berhasil diubah menjadi Terjadwal');
+    } catch (error: any) {
+      toast.error(`Gagal mengubah status: ${error.message}`);
     }
   };
 
@@ -299,16 +311,16 @@ export default function JadwalSeminarPage() {
             <button
               className={cn(
                 "flex-1 py-3 text-sm font-semibold border-b-2 transition-colors",
-                activeTab === 'scheduled' 
+                activeTab === 'waiting_confirmation' 
                   ? "border-primary text-primary" 
                   : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
               )}
               onClick={() => {
-                setActiveTab('scheduled');
+                setActiveTab('waiting_confirmation');
                 handleReset();
               }}
             >
-              Sudah Terjadwal ({scheduledRequests?.length || 0})
+              Menunggu Konfirmasi ({scheduledRequests?.length || 0})
             </button>
           </div>
 
@@ -395,7 +407,7 @@ export default function JadwalSeminarPage() {
             )
           )}
 
-          {activeTab === 'scheduled' && (
+          {activeTab === 'waiting_confirmation' && (
             isLoadingScheduled ? (
               <div className="space-y-4 pt-2">
                 {[...Array(3)].map((_, i) => (
@@ -473,21 +485,32 @@ export default function JadwalSeminarPage() {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="w-full bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+                        className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 border-blue-200"
                         onClick={() => handleSendReminder(request._id as string)}
                         disabled={sendingReminderId === request._id || cancelingId === request._id}
                       >
                         {sendingReminderId === request._id ? (
                           <>
                             <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> 
-                            Mengirim Reminder...
+                            Mengirim...
                           </>
                         ) : (
                           <>
-                            <MessageSquare className="h-3.5 w-3.5 mr-2" /> 
-                            Kirim Reminder WhatsApp
+                            <Send className="h-3.5 w-3.5 mr-2" /> 
+                            Kirim Revisi Jadwal
                           </>
                         )}
+                      </Button>
+                      
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border-green-200"
+                        onClick={() => handleMarkAsScheduled(request._id as string)}
+                        disabled={sendingReminderId === request._id || cancelingId === request._id}
+                      >
+                        <CheckCircle className="h-3.5 w-3.5 mr-2" /> 
+                        Terjadwal
                       </Button>
                       
                       <Button 

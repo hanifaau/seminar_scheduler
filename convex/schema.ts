@@ -118,6 +118,7 @@ export default defineSchema({
     scheduledStartTime: v.optional(v.string()), // Waktu mulai (format HH:mm)
     scheduledEndTime: v.optional(v.string()), // Waktu selesai (format HH:mm)
     scheduledRoom: v.optional(v.string()), // Ruangan (jika sudah)
+    revisionCount: v.optional(v.number()), // Jumlah revisi jadwal
     notes: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),

@@ -359,7 +359,7 @@ export const schedule = mutation({
       scheduledDate: args.scheduledDate,
       scheduledTime: args.scheduledTime,
       scheduledRoom: args.scheduledRoom,
-      status: 'scheduled',
+      status: 'waiting_confirmation',
       updatedAt: Date.now(),
     });
 
@@ -376,8 +376,8 @@ export const cancelSchedule = mutation({
       throw new Error('Permohonan seminar tidak ditemukan');
     }
     
-    if (existing.status !== 'scheduled') {
-      throw new Error('Hanya permohonan dengan status Terjadwal yang dapat dibatalkan jadwalnya');
+    if (existing.status !== 'scheduled' && existing.status !== 'waiting_confirmation') {
+      throw new Error('Hanya permohonan dengan status Terjadwal atau Menunggu Konfirmasi yang dapat dibatalkan jadwalnya');
     }
 
     await ctx.db.patch(args.id, {
@@ -394,6 +394,48 @@ export const cancelSchedule = mutation({
   },
 });
 
+// Mark a request as fully scheduled
+export const markAsScheduled = mutation({
+  args: { id: v.id('seminar_requests') },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.id);
+    if (!existing) {
+      throw new Error('Permohonan seminar tidak ditemukan');
+    }
+
+    if (existing.status !== 'waiting_confirmation') {
+      throw new Error('Permohonan harus dalam status Menunggu Konfirmasi');
+    }
+
+    await ctx.db.patch(args.id, {
+      status: 'scheduled',
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
+  },
+});
+
+// Request a schedule revision
+export const requestRevision = mutation({
+  args: { id: v.id('seminar_requests') },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.id);
+    if (!existing) {
+      throw new Error('Permohonan seminar tidak ditemukan');
+    }
+
+    const currentCount = existing.revisionCount || 0;
+    
+    await ctx.db.patch(args.id, {
+      status: 'waiting_confirmation',
+      revisionCount: currentCount + 1,
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
+  },
+});
 
 // Remove a seminar request
 export const remove = mutation({

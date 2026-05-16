@@ -81,6 +81,7 @@ export default function PermohonanSeminarPage() {
   const createRequest = useMutation(api.seminar_requests.create);
   const updateRequest = useMutation(api.seminar_requests.update);
   const deleteRequest = useMutation(api.seminar_requests.remove);
+  const requestRevision = useMutation(api.seminar_requests.requestRevision);
   const sendReminder = useAction(api.notifications.sendSeminarNotifications);
 
   const handleSendReminder = async (request: any) => {
@@ -182,6 +183,26 @@ export default function PermohonanSeminarPage() {
       setEditingRequest(null);
     } catch (error) {
       toast.error('Gagal menyimpan permohonan');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRequestRevision = async () => {
+    if (!editingRequest) return;
+    
+    if (!confirm('Apakah Anda yakin ingin melakukan revisi jadwal? Status permohonan akan kembali ke "Menunggu Konfirmasi" dan Anda dapat menjadwalkan ulang di halaman Penjadwalan.')) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await requestRevision({ id: editingRequest._id });
+      toast.success('Status diubah ke Menunggu Konfirmasi. Silakan lakukan penjadwalan ulang di halaman Penjadwalan.');
+      setIsDialogOpen(false);
+      setEditingRequest(null);
+    } catch (error: any) {
+      toast.error(`Gagal melakukan revisi jadwal: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -569,6 +590,16 @@ export default function PermohonanSeminarPage() {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
+              {editingRequest?.status === 'scheduled' && (
+                <Button
+                  variant="outline"
+                  className="bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 hover:text-orange-800 mr-auto"
+                  onClick={handleRequestRevision}
+                  disabled={isSubmitting}
+                >
+                  Revisi Jadwal
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => {

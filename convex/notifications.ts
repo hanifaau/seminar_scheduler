@@ -4,7 +4,8 @@ import { api } from './_generated/api';
 
 // Types for notification payload
 interface NotificationPayload {
-  messageType: 'undangan' | 'reminder';
+  messageType: 'undangan' | 'reminder' | 'revisi';
+  revisionCount?: number;
   studentName: string;
   nim: string;
   seminarType: string;
@@ -53,11 +54,14 @@ function buildWhatsAppMessage(payload: NotificationPayload): string {
     timeStr = timeStr.replace(/:/g, '.');
   }
 
-  const intro = payload.messageType === 'reminder'
-    ? `*REMINDER*\nSalam Bapak/Ibu..izin mengingatkan kembali terkait jadwal seminar mhs berikut ya Pak/Bu..`
-    : `Salam Bapak/Ibu..izin konfirmasi terkait jadwal seminar mhs berikut ya Pak/Bu..`;
+  let intro = `Salam Bapak/Ibu..izin konfirmasi terkait jadwal seminar mhs berikut ya Pak/Bu..`;
+  if (payload.messageType === 'reminder') {
+    intro = `*REMINDER*\nSalam Bapak/Ibu..izin mengingatkan kembali terkait jadwal seminar mhs berikut ya Pak/Bu..`;
+  }
 
-  return `${intro} 
+  const revisiLine = payload.messageType === 'revisi' ? `\n*REVISI ${payload.revisionCount || 1}* ` : '';
+
+  return `${intro} ${revisiLine}
 *Jadwal ${payload.seminarType} Offline* a.n. *${payload.studentName}* NIM *${payload.nim}*
 
 Dijadwalkan 
@@ -185,7 +189,7 @@ export const sendWhatsAppNotification = action({
 export const sendSeminarNotifications = action({
   args: {
     seminarRequestId: v.id('seminar_requests'),
-    messageType: v.union(v.literal('undangan'), v.literal('reminder')),
+    messageType: v.union(v.literal('undangan'), v.literal('reminder'), v.literal('revisi')),
   },
   handler: async (ctx, args): Promise<{
     success: boolean;
@@ -271,6 +275,7 @@ export const sendSeminarNotifications = action({
         room: seminarRequest.scheduledRoom || 'R. Seminar Lt. 1',
         supervisors,
         examiners,
+        revisionCount: seminarRequest.revisionCount,
       });
 
       try {
