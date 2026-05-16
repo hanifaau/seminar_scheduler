@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useQuery, useMutation } from 'convex/react';
-import { Plus, Edit, Trash2, Loader2, FileText, Users } from 'lucide-react';
+import { useQuery, useMutation, useAction } from 'convex/react';
+import { Plus, Edit, Trash2, Loader2, FileText, Users, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from 'convex/_generated/api';
 import { Button } from '@/components/atoms/Button';
@@ -45,10 +45,12 @@ const SEMINAR_TYPES = [
   { value: 'Sidang', label: 'Sidang Skripsi' },
 ];
 
-const STATUS_LABELS: Record<string, { label: string; variant: 'secondary' | 'warning' | 'success' }> = {
+const STATUS_LABELS: Record<string, { label: string; variant: 'secondary' | 'warning' | 'success' | 'outline' | 'default' }> = {
   requested: { label: 'Menunggu Alokasi', variant: 'warning' },
   allocated: { label: 'Siap Dijadwalkan', variant: 'secondary' },
+  waiting_confirmation: { label: 'Menunggu Konfirmasi', variant: 'outline' },
   scheduled: { label: 'Terjadwal', variant: 'success' },
+  completed: { label: 'Selesai', variant: 'default' },
 };
 
 export default function PermohonanSeminarPage() {
@@ -79,12 +81,38 @@ export default function PermohonanSeminarPage() {
   const createRequest = useMutation(api.seminar_requests.create);
   const updateRequest = useMutation(api.seminar_requests.update);
   const deleteRequest = useMutation(api.seminar_requests.remove);
+  const sendReminder = useAction(api.notifications.sendSeminarNotifications);
+
+  const handleSendReminder = async (request: any) => {
+    const toastId = toast.loading('Mengirim reminder...');
+    try {
+      const result = await sendReminder({
+        seminarRequestId: request._id,
+        messageType: 'reminder'
+      });
+      if (result.success) {
+        toast.success('Reminder berhasil dikirim ke dosen', { id: toastId });
+      } else {
+        toast.warning('Beberapa reminder gagal dikirim. Cek log.', { id: toastId });
+      }
+    } catch (error) {
+      toast.error('Gagal mengirim reminder', { id: toastId });
+    }
+  };
 
   // Filter requests
   const filteredRequests = React.useMemo(() => {
     if (!requests) return [];
 
-    return requests.filter((request) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    return requests.map(request => {
+      // Auto-update to 'completed' if scheduledDate is passed
+      if (request.status === 'scheduled' && request.scheduledDate && request.scheduledDate < todayStr) {
+        return { ...request, status: 'completed' };
+      }
+      return request;
+    }).filter((request) => {
       const matchesSearch =
         searchQuery === '' ||
         request.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -241,7 +269,9 @@ export default function PermohonanSeminarPage() {
             <SelectItem value="semua">Semua Status</SelectItem>
             <SelectItem value="requested">Menunggu Alokasi</SelectItem>
             <SelectItem value="allocated">Siap Dijadwalkan</SelectItem>
+            <SelectItem value="waiting_confirmation">Menunggu Konfirmasi</SelectItem>
             <SelectItem value="scheduled">Terjadwal</SelectItem>
+            <SelectItem value="completed">Selesai</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -252,14 +282,14 @@ export default function PermohonanSeminarPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
-                <th className="px-4 py-3 text-left font-medium">Mahasiswa</th>
-                <th className="px-4 py-3 text-left font-medium">NIM</th>
-                <th className="px-4 py-3 text-left font-medium">Judul</th>
-                <th className="px-4 py-3 text-left font-medium">Jenis</th>
-                <th className="px-4 py-3 text-left font-medium">Pembimbing</th>
-                <th className="px-4 py-3 text-left font-medium">Jadwal & Ruangan</th>
-                <th className="px-4 py-3 text-left font-medium">Status</th>
-                <th className="px-4 py-3 text-right font-medium">Aksi</th>
+                <th className="px-4 py-3 text-center font-medium">Mahasiswa</th>
+                <th className="px-4 py-3 text-center font-medium">NIM</th>
+                <th className="px-4 py-3 text-center font-medium">Judul</th>
+                <th className="px-4 py-3 text-center font-medium">Jenis</th>
+                <th className="px-4 py-3 text-center font-medium">Pembimbing</th>
+                <th className="px-4 py-3 text-center font-medium">Jadwal & Ruangan</th>
+                <th className="px-4 py-3 text-center font-medium">Status</th>
+                <th className="px-4 py-3 text-center font-medium">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -288,24 +318,24 @@ export default function PermohonanSeminarPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Mahasiswa</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">NIM</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Judul</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Jenis</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Pembimbing</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Jadwal & Ruangan</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Status</th>
-                  <th className="px-4 py-3 text-right font-medium text-foreground">Aksi</th>
+                  <th className="px-4 py-3 text-center font-medium text-foreground">Mahasiswa</th>
+                  <th className="px-4 py-3 text-center font-medium text-foreground">NIM</th>
+                  <th className="px-4 py-3 text-center font-medium text-foreground">Judul</th>
+                  <th className="px-4 py-3 text-center font-medium text-foreground">Jenis</th>
+                  <th className="px-4 py-3 text-center font-medium text-foreground">Pembimbing</th>
+                  <th className="px-4 py-3 text-center font-medium text-foreground">Jadwal & Ruangan</th>
+                  <th className="px-4 py-3 text-center font-medium text-foreground">Status</th>
+                  <th className="px-4 py-3 text-center font-medium text-foreground">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRequests.map((request) => {
                   const statusInfo = STATUS_LABELS[request.status];
                   return (
-                    <tr key={request._id} className="border-b hover:bg-muted/30 transition-colors">
+                    <tr key={request._id} className="border-b hover:bg-muted/30 transition-colors text-center">
                       <td className="px-4 py-3 font-medium text-foreground">{request.studentName}</td>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{request.nim}</td>
-                      <td className="px-4 py-3 max-w-[200px] truncate text-foreground" title={request.title}>
+                      <td className="px-4 py-3 max-w-[200px] truncate text-foreground mx-auto" title={request.title}>
                         {request.title}
                       </td>
                       <td className="px-4 py-3">
@@ -314,7 +344,7 @@ export default function PermohonanSeminarPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-col gap-0.5 items-center">
                           <span className="text-foreground">{request.supervisor1?.name || '-'}</span>
                           {request.supervisor2 && (
                             <span className="text-xs text-muted-foreground">
@@ -325,7 +355,7 @@ export default function PermohonanSeminarPage() {
                       </td>
                       <td className="px-4 py-3">
                         {request.scheduledDate ? (
-                          <div className="flex flex-col gap-0.5 text-xs">
+                          <div className="flex flex-col gap-0.5 text-xs items-center">
                             <span className="font-medium text-foreground">{request.scheduledDate}</span>
                             <span className="text-muted-foreground">{request.scheduledStartTime} - {request.scheduledEndTime}</span>
                             <span className="text-muted-foreground">Ruang: {request.scheduledRoom || '-'}</span>
@@ -340,7 +370,19 @@ export default function PermohonanSeminarPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-center gap-2 items-center">
+                          {request.status === 'scheduled' ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Kirim Reminder"
+                              onClick={() => handleSendReminder(request)}
+                            >
+                              <Bell className="h-4 w-4 text-blue-500" />
+                            </Button>
+                          ) : (
+                            <span className="text-muted-foreground mx-2 font-bold">-</span>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"

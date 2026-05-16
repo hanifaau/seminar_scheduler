@@ -25,7 +25,9 @@ export const getByStatus = query({
   args: { status: v.union(
     v.literal('requested'),
     v.literal('allocated'),
-    v.literal('scheduled')
+    v.literal('waiting_confirmation'),
+    v.literal('scheduled'),
+    v.literal('completed')
   )},
   handler: async (ctx, args) => {
     return await ctx.db
@@ -78,7 +80,9 @@ export const getByStatusWithLecturers = query({
     status: v.union(
       v.literal('requested'),
       v.literal('allocated'),
-      v.literal('scheduled')
+      v.literal('waiting_confirmation'),
+      v.literal('scheduled'),
+      v.literal('completed')
     ),
   },
   handler: async (ctx, args) => {

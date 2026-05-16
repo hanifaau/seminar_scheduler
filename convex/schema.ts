@@ -109,7 +109,9 @@ export default defineSchema({
     status: v.union(
       v.literal('requested'), // Menunggu alokasi penguji
       v.literal('allocated'), // Sudah ada penguji, siap dijadwalkan
-      v.literal('scheduled') // Sudah dijadwalkan
+      v.literal('waiting_confirmation'), // Menunggu konfirmasi
+      v.literal('scheduled'), // Sudah dijadwalkan
+      v.literal('completed') // Selesai
     ),
     scheduledDate: v.optional(v.string()), // Tanggal terjadwal (jika sudah)
     scheduledTime: v.optional(v.string()), // Waktu terjadwal (jika sudah) - deprecated, use startTime/endTime
