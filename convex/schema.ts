@@ -49,25 +49,21 @@ export default defineSchema({
     .index('by_nip', ['nip'])
     .index('by_role', ['role']),
 
-  // Courses table - stores course information (Master Mata Kuliah)
-  courses: defineTable({
-    code: v.string(), // e.g., "TI101"
-    name: v.string(), // e.g., "Metode Statistik" (unique, used for CSV mapping)
-    sks: v.number(), // Credit units: 2 or 3
-    lecturerIds: v.array(v.id('lecturers')), // Array of lecturer IDs (Team Dosen Pengampu)
-    semester: v.optional(v.number()), // e.g., 1-8
-    description: v.optional(v.string()),
+  // Schedule Groups table - stores grouped teaching schedules (Reguler, UTS, UAS, etc.)
+  schedule_groups: defineTable({
+    name: v.string(), // e.g., "Jadwal Reguler Genap 24/25"
+    type: v.string(), // e.g., "reguler", "uts", "uas", "libur"
+    isActive: v.boolean(), // Is this schedule currently active?
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
   })
-    .index('by_code', ['code'])
-    .index('by_name', ['name'])
-    .index('by_sks', ['sks']),
+    .index('by_active', ['isActive'])
+    .index('by_type', ['type']),
 
   // Teaching schedules table - stores teaching schedule entries
   teaching_schedules: defineTable({
     lecturerId: v.id('lecturers'),
-    courseId: v.optional(v.id('courses')), // Reference to course
+    groupId: v.optional(v.id('schedule_groups')), // Reference to schedule group
     day: v.string(), // e.g., "Senin", "Selasa", etc.
     shiftId: v.optional(v.string()), // e.g., "2sks-1", "3sks-2"
     startTime: v.string(), // e.g., "07:30"
@@ -81,7 +77,7 @@ export default defineSchema({
     .index('by_lecturer', ['lecturerId'])
     .index('by_lecturer_day', ['lecturerId', 'day'])
     .index('by_day', ['day'])
-    .index('by_course', ['courseId'])
+    .index('by_group', ['groupId'])
     .index('by_room_day', ['room', 'day']),
 
   // Expertise categories table - stores predefined expertise areas

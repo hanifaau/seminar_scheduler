@@ -2,635 +2,332 @@
 
 import * as React from 'react';
 import { useQuery, useMutation } from 'convex/react';
-import { ArrowLeft, Loader2, Upload, FileText, Download, Check, X, AlertTriangle, Info, Link as LinkIcon } from 'lucide-react';
-import Link from 'next/link';
-import Papa from 'papaparse';
+import { Plus, Trash2, Power, Upload, Loader2, CalendarRange, Check, X, AlertTriangle } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { api } from 'convex/_generated/api';
 import { Button } from '@/components/atoms/Button';
 import { Badge } from '@/components/atoms/Badge';
+import { Input } from '@/components/atoms/Input';
+import { Label } from '@/components/atoms/Label';
 import { cn } from '@/lib/utils';
 
-// Minimalist CSV format: Mata Kuliah, Dosen, Hari, Waktu, Ruang
-interface ParsedScheduleRow {
-  _rowNumber: number;
-  mataKuliah: string;
-  dosen: string;
-  hari: string;
-  waktu: string;
-  waktuMulai: string;
-  waktuSelesai: string;
-  ruangan: string;
-  _isValid: boolean;
-  _courseFound: boolean;
-  _lecturerCount: number;
-  _errors: string[];
-}
-
-// Skeleton components
-function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse rounded-md bg-muted', className)} />;
-}
-
-function TableRowSkeleton() {
-  return (
-    <tr className="border-b">
-      <td className="px-3 py-2"><Skeleton className="h-4 w-8" /></td>
-      <td className="px-3 py-2"><Skeleton className="h-4 w-40" /></td>
-      <td className="px-3 py-2"><Skeleton className="h-4 w-32" /></td>
-      <td className="px-3 py-2"><Skeleton className="h-4 w-20" /></td>
-      <td className="px-3 py-2"><Skeleton className="h-4 w-28" /></td>
-      <td className="px-3 py-2"><Skeleton className="h-4 w-24" /></td>
-      <td className="px-3 py-2"><Skeleton className="h-6 w-16" /></td>
-    </tr>
-  );
-}
-
-const VALID_DAYS = [
-  'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu',
-  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-];
-
-function isValidTime(time: string): boolean {
-  return /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/.test(time);
-}
-
-// Parse time range like "07:30 - 10:00", "07.30 - 10.00", "07:30-10:00" or "07.30-10.00"
-function parseTimeRange(waktu: string): { start: string; end: string } | null {
-  const cleaned = waktu.replace(/\s+/g, '');
-  const match = cleaned.match(/^(\d{1,2}[:\.][0-5]\d)-(\d{1,2}[:\.][0-5]\d)$/);
-  if (match) {
-    const normalize = (value: string) => value.replace('.', ':').padStart(5, '0');
-    const start = normalize(match[1]);
-    const end = normalize(match[2]);
-    if (isValidTime(start) && isValidTime(end)) {
-      return { start, end };
-    }
-  }
-  return null;
-}
-
-// Generate CSV template with MINIMALIST format
-function generateMinimalistTemplate(): string {
-  const headers = ['Mata Kuliah', 'Dosen', 'Hari', 'Waktu', 'Ruang'];
-  const sampleData = [
-    ['Perencanaan dan Pengendalian Produksi', 'Jonrinaldi', 'Senin', '07.30 - 10.00', 'Lab. Komputer 1'],
-    ['Metode Statistik', 'Hanifa', 'Selasa', '10.10 - 12.40', 'Ruang Kelas A'],
-    ['Kalkulus II', 'Aulia', 'Rabu', '13.30 - 16.00', 'Lab. Ergonomi'],
-  ];
-  const csvContent = [
-    headers.join(','),
-    ...sampleData.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-  ].join('\n');
-  return csvContent;
-}
-
-export default function UnggahJadwalPage() {
-  const [parsedData, setParsedData] = React.useState<ParsedScheduleRow[]>([]);
+export default function ScheduleGroupsPage() {
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
-  const [uploadResult, setUploadResult] = React.useState<{
-    slotsImported: number;
-    lecturersLinked: number;
-    coursesNotFound: string[];
-    lecturersNotFound?: string[];
-    message: string;
-  } | null>(null);
+
+  // Form State
+  const [groupName, setGroupName] = React.useState('');
+  const [groupType, setGroupType] = React.useState('reguler');
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
 
   // Queries
-  const courses = useQuery(api.courses.getAll);
-  const existingSchedules = useQuery(api.teaching_schedules.getAllWithLecturer);
+  const groups = useQuery(api.teaching_schedules.getGroups);
 
   // Mutations
-  const importFromMinimalistCSV = useMutation(api.teaching_schedules.importFromMinimalistCSV);
+  const createGroup = useMutation(api.teaching_schedules.createGroup);
+  const toggleGroupActive = useMutation(api.teaching_schedules.toggleGroupActive);
+  const deleteGroup = useMutation(api.teaching_schedules.deleteGroup);
+  const importSmartSchedule = useMutation(api.teaching_schedules.importSmartSchedule);
 
-  // Create course name lookup
-  const courseLookup = React.useMemo(() => {
-    if (!courses) return new Map();
-    const map = new Map<string, { id: string; name: string; lecturerCount: number }>();
-    courses.forEach((c) => {
-      map.set(c.name.toLowerCase().trim(), {
-        id: c._id,
-        name: c.name,
-        lecturerCount: c.lecturerIds?.length || 0,
-      });
-    });
-    return map;
-  }, [courses]);
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadResult(null);
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header) => {
-        const h = header.toLowerCase().trim().replace(/[_\s]+/g, '');
-        if (h.includes('hari') || h.includes('day')) return 'hari';
-        if (h.includes('waktu') || h.includes('time') || h.includes('jam')) return 'waktu';
-        if (h.includes('mata') || h.includes('kuliah') || h.includes('course') || h.includes('matkul')) return 'matakuliah';
-        if (h.includes('ruang') || h.includes('room') || h.includes('ruangan')) return 'ruangan';
-        if (h.includes('dosen') || h.includes('pengajar') || h.includes('lecturer')) return 'dosen';
-        return h;
-      },
-      complete: (results) => {
-        const data = results.data as Record<string, string>[];
-        const validated: ParsedScheduleRow[] = [];
-        const coursesNotFoundSet = new Set<string>();
-
-        data
-          .filter((row) => row.hari || row.waktu || row.matakuliah)
-          .forEach((row, index) => {
-            const errors: string[] = [];
-            const rowNumber = index + 2;
-
-            // Validate Hari
-            if (!row.hari?.trim()) {
-              errors.push('Hari wajib diisi');
-            } else if (!VALID_DAYS.includes(row.hari.toLowerCase().trim())) {
-              errors.push(`Hari "${row.hari}" tidak valid`);
-            }
-
-            // Validate Waktu
-            let waktuMulai = '';
-            let waktuSelesai = '';
-            if (!row.waktu?.trim()) {
-              errors.push('Waktu wajib diisi');
-            } else {
-              const parsed = parseTimeRange(row.waktu.trim());
-              if (!parsed) {
-                errors.push(`Format waktu tidak valid. Gunakan format: HH.mm - HH.mm`);
-              } else {
-                waktuMulai = parsed.start;
-                waktuSelesai = parsed.end;
-              }
-            }
-
-            // Validate Dosen
-            if (!row.dosen?.trim()) {
-              errors.push('Dosen wajib diisi');
-            }
-
-            // Validate Mata Kuliah
-            let courseFound = false;
-            let lecturerCount = 0;
-            if (!row.matakuliah?.trim()) {
-              errors.push('Mata kuliah wajib diisi');
-            } else {
-              const course = courseLookup.get(row.matakuliah.trim().toLowerCase());
-              if (course) {
-                courseFound = true;
-                lecturerCount = course.lecturerCount;
-                if (lecturerCount === 0) {
-                  errors.push('Mata kuliah belum memiliki dosen pengampu');
-                }
-              } else {
-                coursesNotFoundSet.add(row.matakuliah.trim());
-                errors.push(`Mata kuliah "${row.matakuliah}" tidak ditemukan di Master`);
-              }
-            }
-
-            validated.push({
-              _rowNumber: rowNumber,
-              mataKuliah: row.matakuliah?.trim() || '',
-              dosen: row.dosen?.trim() || '',
-              hari: row.hari?.trim() || '',
-              waktu: row.waktu?.trim() || '',
-              waktuMulai,
-              waktuSelesai,
-              ruangan: row.ruangan?.trim() || '',
-              _isValid: errors.length === 0,
-              _courseFound: courseFound,
-              _lecturerCount: lecturerCount,
-              _errors: errors.length > 0 ? errors : [],
-            });
-          });
-
-        setParsedData(validated);
-      },
-      error: (error) => {
-        toast.error(`Gagal membaca file CSV: ${error.message}`);
-      },
-    });
+  const handleToggleActive = async (id: any, currentStatus: boolean) => {
+    try {
+      await toggleGroupActive({ id, isActive: !currentStatus });
+      toast.success(currentStatus ? 'Jadwal dinonaktifkan' : 'Jadwal diaktifkan');
+    } catch (error) {
+      toast.error('Gagal mengubah status jadwal');
+    }
   };
 
-  const handleConfirmUpload = async () => {
-    const validRows = parsedData.filter((row) => row._isValid);
+  const handleDeleteGroup = async (id: any, name: string) => {
+    if (!confirm(`Hapus jadwal "${name}" beserta seluruh isinya? Tindakan ini tidak dapat dibatalkan.`)) return;
+    try {
+      await deleteGroup({ id });
+      toast.success('Jadwal berhasil dihapus');
+    } catch (error) {
+      toast.error('Gagal menghapus jadwal');
+    }
+  };
 
-    if (validRows.length === 0) {
-      toast.error('Tidak ada data valid untuk diunggah');
+  const processUpload = async () => {
+    if (!selectedFile || !groupName) {
+      toast.error('Nama jadwal dan file Excel wajib diisi');
       return;
     }
 
     setIsUploading(true);
-
     try {
-      // Prepare data for import
-      const schedulesToImport = validRows.map((row) => ({
-        day: row.hari,
-        time: row.waktu,
-        courseName: row.mataKuliah,
-        room: row.ruangan,
-        lecturerNames: row.dosen || undefined,
-      }));
-
-      const result = await importFromMinimalistCSV({ schedules: schedulesToImport });
-
-      setUploadResult({
-        slotsImported: result.slotsImported,
-        lecturersLinked: result.lecturersLinked,
-        coursesNotFound: result.coursesNotFound,
-        message: result.message,
+      // 1. Create Group first
+      const groupId = await createGroup({
+        name: groupName,
+        type: groupType,
+        isActive: false, // Default nonaktif
       });
 
-      toast.success(result.message);
-      setParsedData([]);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Gagal mengunggah jadwal');
-    } finally {
+      // 2. Parse Excel File
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          // Get raw rows (array of arrays)
+          const rows = XLSX.utils.sheet_to_json<any[]>(firstSheet, { header: 1, defval: '' });
+
+          if (!rows || rows.length === 0) throw new Error('File kosong');
+
+          // Find Header Row
+          let headerRowIdx = -1;
+          let colIdx = { hari: -1, waktu: -1, matkul: -1, dosen: -1, ruang: -1 };
+
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i].map(c => String(c).toLowerCase().trim());
+            
+            const hariIdx = row.findIndex(c => c.includes('hari') || c === 'day');
+            const waktuIdx = row.findIndex(c => c.includes('waktu') || c.includes('jam') || c === 'time');
+            const matkulIdx = row.findIndex(c => c.includes('mata kuliah') || c.includes('matkul') || c.includes('course'));
+            const dosenIdx = row.findIndex(c => c.includes('dosen') || c.includes('pengampu'));
+            const ruangIdx = row.findIndex(c => c.includes('ruang'));
+
+            // We need at least Hari, Waktu, Matkul, and Dosen to proceed
+            if (hariIdx > -1 && waktuIdx > -1 && matkulIdx > -1 && dosenIdx > -1) {
+              headerRowIdx = i;
+              colIdx = { hari: hariIdx, waktu: waktuIdx, matkul: matkulIdx, dosen: dosenIdx, ruang: ruangIdx };
+              break;
+            }
+          }
+
+          if (headerRowIdx === -1) {
+            throw new Error('Gagal menemukan baris header. Pastikan file memiliki kolom: Hari, Waktu, Mata Kuliah, dan Dosen Pengampu.');
+          }
+
+          const parsedSchedules = [];
+          let lastHari = '';
+
+          // Parse Data Rows
+          for (let i = headerRowIdx + 1; i < rows.length; i++) {
+            const row = rows[i];
+            
+            // Fill down Hari if merged/empty
+            let currentHari = String(row[colIdx.hari] || '').trim();
+            if (!currentHari) {
+              currentHari = lastHari; // use previous
+            } else {
+              lastHari = currentHari;
+            }
+
+            const waktuRaw = String(row[colIdx.waktu] || '').trim();
+            const matkul = String(row[colIdx.matkul] || '').trim();
+            const dosen = String(row[colIdx.dosen] || '').trim();
+            const ruang = colIdx.ruang > -1 ? String(row[colIdx.ruang] || '').trim() : '';
+
+            // Skip empty rows
+            if (!waktuRaw || !matkul || !dosen) continue;
+
+            // Parse time range e.g. "07.30 - 10.00" or "07:30-10:00"
+            const timeMatch = waktuRaw.replace(/\s+/g, '').match(/^(\d{1,2}[:\.][0-5]\d)-(\d{1,2}[:\.][0-5]\d)$/);
+            let startTime = '', endTime = '';
+            
+            if (timeMatch) {
+              startTime = timeMatch[1].replace('.', ':').padStart(5, '0');
+              endTime = timeMatch[2].replace('.', ':').padStart(5, '0');
+            } else {
+              // try to parse if only one time is provided or split by space
+              continue; // skip invalid time for now
+            }
+
+            parsedSchedules.push({
+              day: currentHari,
+              startTime,
+              endTime,
+              activity: matkul,
+              room: ruang,
+              lecturerNames: dosen,
+            });
+          }
+
+          if (parsedSchedules.length === 0) {
+            throw new Error('Tidak ada data jadwal valid yang ditemukan di bawah baris header.');
+          }
+
+          // Send to backend
+          const result = await importSmartSchedule({
+            groupId: groupId,
+            schedules: parsedSchedules,
+          });
+
+          toast.success(result.message);
+          setIsUploadDialogOpen(false);
+          setGroupName('');
+          setSelectedFile(null);
+
+        } catch (error: any) {
+          // If error happens during parsing, delete the empty group we just created
+          await deleteGroup({ id: groupId });
+          toast.error(error.message || 'Gagal memproses file Excel');
+        } finally {
+          setIsUploading(false);
+        }
+      };
+
+      reader.readAsArrayBuffer(selectedFile);
+    } catch (error: any) {
+      toast.error(error.message || 'Gagal membuat grup jadwal');
       setIsUploading(false);
     }
   };
 
-  const handleDownloadTemplate = () => {
-    const csvContent = generateMinimalistTemplate();
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'template_jadwal_minimalis.csv';
-    link.click();
-  };
-
-  const validRows = parsedData.filter((row) => row._isValid);
-  const invalidRows = parsedData.filter((row) => !row._isValid);
-  const isLoading = courses === undefined;
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Unggah Jadwal Kuliah</h1>
+          <h1 className="text-2xl font-bold text-foreground">Kelola Jadwal</h1>
           <p className="text-muted-foreground">
-            Import jadwal kuliah dari CSV dengan auto-mapping ke Master Mata Kuliah
+            Kelola kumpulan jadwal dosen (Reguler, UTS, UAS, dll) untuk pencarian slot seminar
           </p>
         </div>
+        <Button onClick={() => setIsUploadDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+          <Plus className="h-4 w-4 mr-2" />
+          Unggah Jadwal Baru
+        </Button>
       </div>
 
-      {/* Loading state */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-12">
+      {groups === undefined ? (
+        <div className="flex justify-center py-10">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      )}
-
-      {/* Upload Form */}
-      {!isLoading && parsedData.length === 0 && !uploadResult && (
-        <>
-          {/* Instructions */}
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30 p-4">
-            <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-              <div className="space-y-3 text-sm">
-                <p className="font-medium text-emerald-800 dark:text-emerald-300">
-                  Format CSV Minimalis (Auto-Mapping)
-                </p>
-                <div className="bg-background rounded p-3 font-mono text-xs overflow-x-auto border">
-                  <p className="text-muted-foreground"># Kolom: Mata Kuliah, Dosen, Hari, Waktu, Ruang</p>
-                  <p className="text-muted-foreground"># Contoh: "Kalkulus II", "Hanifa", Senin, "13.30 - 15.10", "Ruang A"</p>
-                </div>
-                <div className="space-y-2 text-emerald-700 dark:text-emerald-400">
-                  <p className="font-medium flex items-center gap-2">
-                    <LinkIcon className="h-4 w-4" />
-                    Cara Kerja Auto-Mapping:
-                  </p>
-                  <ol className="list-decimal pl-5 space-y-1">
-                    <li>Sistem mencari mata kuliah berdasarkan <strong>nama yang sama persis</strong></li>
-                    <li>Kolom <strong>Dosen wajib diisi</strong>. Gunakan nama pendek seperti <em>Hanifa</em>, bukan gelar lengkap.</li>
-                    <li>Jika kolom <strong>Dosen diisi</strong>, sistem akan mencari kecocokan nama dosen di Master Dosen dan hanya assign ke dosen tersebut (berguna untuk kelas paralel).</li>
-                    <li>Untuk lebih dari satu dosen, pisahkan nama dengan koma.</li>
-                  </ol>
-                </div>
-                <div className="bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 p-2 rounded text-xs font-medium border border-amber-200 dark:border-amber-800">
-                  Important: Pastikan Nama Mata Kuliah di CSV <strong>sama persis</strong> dengan yang ada di Master Mata Kuliah, dan kolom <strong>Dosen wajib diisi</strong>.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Link to Master Courses */}
-          <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
-            <div>
-              <p className="font-medium text-foreground">Master Mata Kuliah</p>
-              <p className="text-xs text-muted-foreground">
-                Pastikan mata kuliah dan dosen pengampu sudah diatur sebelum import
-              </p>
-            </div>
-            <Link href="/admin/courses">
-              <Button variant="outline" size="sm">
-                Kelola Master MK
-              </Button>
-            </Link>
-          </div>
-
-          {/* Upload Area */}
-          <div className="border-2 border-dashed rounded-lg p-8 text-center">
-            <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="font-medium text-foreground mb-2">
-              Seret file CSV ke sini atau klik untuk memilih
-            </p>
-            <p className="text-sm text-muted-foreground mb-6">
-              Format: <strong>Mata Kuliah, Dosen, Hari, Waktu, Ruang</strong>. Kolom <strong>Dosen wajib diisi</strong>.
-            </p>
-
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="schedule-csv-upload"
-              disabled={isUploading}
-            />
-
-            <div className="flex items-center justify-center gap-4">
-              <Button variant="outline" onClick={handleDownloadTemplate}>
-                <Download className="h-4 w-4 mr-2" />
-                Unduh Template CSV
-              </Button>
-              <label htmlFor="schedule-csv-upload">
-                <Button className="cursor-pointer bg-emerald-600 hover:bg-emerald-700" asChild>
-                  <span>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Pilih File CSV
-                  </span>
-                </Button>
-              </label>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* CSV Preview */}
-      {parsedData.length > 0 && (
-        <div className="space-y-4">
-          {/* Summary */}
-          <div className="flex flex-wrap items-center gap-4 p-4 rounded-lg bg-muted/50">
-            <div className="flex items-center gap-2">
-              <Check className="h-5 w-5 text-emerald-500" />
-              <span className="font-medium text-foreground">{validRows.length} data valid</span>
-            </div>
-            {invalidRows.length > 0 && (
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-500" />
-                <span className="font-medium text-foreground">{invalidRows.length} data tidak valid</span>
-              </div>
-            )}
-            {validRows.length > 0 && (
-              <div className="flex items-center gap-2">
-                <LinkIcon className="h-5 w-5 text-blue-500" />
-                <span className="font-medium text-foreground">
-                  Akan diproses {validRows.length} baris jadwal
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Table */}
-          <div className="rounded-lg border overflow-hidden">
-            <div className="overflow-x-auto max-h-96">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 sticky top-0">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">#</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Mata Kuliah</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Hari</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Waktu</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Ruang</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Dosen</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {parsedData.map((row) => (
-                    <tr
-                      key={row._rowNumber}
-                      className={cn(
-                        'border-t',
-                        row._isValid ? 'bg-background' : 'bg-red-50 dark:bg-red-900/10'
-                      )}
-                    >
-                      <td className="px-3 py-2 text-muted-foreground">{row._rowNumber}</td>
-                      <td className="px-3 py-2 max-w-[200px] truncate" title={row.mataKuliah}>
-                        {row.mataKuliah}
-                      </td>
-                      <td className="px-3 py-2">{row.hari}</td>
-                      <td className="px-3 py-2 font-mono text-xs">
-                        {row.waktuMulai} - {row.waktuSelesai}
-                      </td>
-                      <td className="px-3 py-2">{row.ruangan || '-'}</td>
-                      <td className="px-3 py-2 max-w-[180px] truncate" title={row.dosen}>
-                        {row.dosen || '-'}
-                      </td>
-                      <td className="px-3 py-2">
-                        {row._isValid ? (
-                          <Badge variant="success" className="text-xs">
-                            <Check className="h-3 w-3 mr-1" />
-                            Valid
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs">
-                            <X className="h-3 w-3 mr-1" />
-                            Invalid
-                          </Badge>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Error Details */}
-          {invalidRows.length > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4">
-              <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-2">
-                Data dengan error akan dilewati:
-              </h4>
-              <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1 max-h-32 overflow-y-auto">
-                {invalidRows.map((row) => (
-                  <li key={row._rowNumber}>
-                    Baris {row._rowNumber}: {row._errors?.join(', ')}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setParsedData([])}
-              disabled={isUploading}
-            >
-              Batal
-            </Button>
-            <Button
-              onClick={handleConfirmUpload}
-              disabled={isUploading || validRows.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Mengimpor...
-                </>
-              ) : (
-                `Impor ${validRows.length} Slot`
+      ) : groups.length === 0 ? (
+        <div className="rounded-lg border p-12 text-center bg-card">
+          <CalendarRange className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Belum ada kumpulan jadwal</h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            Unggah file jadwal Excel dari Kaprodi untuk mulai menggunakan sistem penjadwalan.
+          </p>
+          <Button onClick={() => setIsUploadDialogOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Unggah Sekarang
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {groups.map((group) => (
+            <div
+              key={group._id}
+              className={cn(
+                "rounded-xl border p-5 transition-all",
+                group.isActive ? "border-emerald-500 shadow-md bg-emerald-50/50 dark:bg-emerald-950/10" : "bg-card hover:shadow-sm"
               )}
-            </Button>
-          </div>
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className="space-y-1">
+                  <Badge variant={group.isActive ? 'default' : 'secondary'} className={group.isActive ? 'bg-emerald-500' : ''}>
+                    {group.isActive ? 'Aktif' : 'Nonaktif'}
+                  </Badge>
+                  <Badge variant="outline" className="ml-2 uppercase text-[10px]">
+                    {group.type}
+                  </Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDeleteGroup(group._id, group.name)}
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 -mr-2 -mt-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <h3 className="font-bold text-lg mb-1 leading-tight">{group.name}</h3>
+              <p className="text-xs text-muted-foreground mb-6">
+                Dibuat: {new Date(group.createdAt).toLocaleDateString('id-ID')}
+              </p>
+
+              <Button
+                variant={group.isActive ? "outline" : "default"}
+                className={cn("w-full", group.isActive && "border-emerald-500 text-emerald-600 hover:bg-emerald-50")}
+                onClick={() => handleToggleActive(group._id, group.isActive)}
+              >
+                <Power className="h-4 w-4 mr-2" />
+                {group.isActive ? 'Matalkan Aktif' : 'Aktifkan Jadwal'}
+              </Button>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Upload Result */}
-      {uploadResult && (
-        <div className="space-y-4 mb-12">
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
-                <Check className="h-5 w-5 text-white" />
+      {/* Upload Dialog */}
+      {isUploadDialogOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                <Upload className="h-5 w-5 text-primary" />
+                Unggah Jadwal Baru
+              </h2>
+              <Button variant="ghost" size="icon" onClick={() => setIsUploadDialogOpen(false)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-5">
+              <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-xl flex gap-3 text-sm text-blue-800 dark:text-blue-300">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                <p>
+                  Sistem akan otomatis mendeteksi tabel jadwal Anda. Pastikan baris judul (header) mengandung teks seperti <strong>Mata Kuliah</strong>, <strong>Dosen</strong>, <strong>Hari</strong>, dan <strong>Waktu</strong>. File berformat <strong>.xlsx</strong> sangat disarankan.
+                </p>
               </div>
+
               <div>
-                <h3 className="font-semibold text-foreground">Import Berhasil!</h3>
-                <p className="text-sm text-muted-foreground">{uploadResult.message}</p>
+                <Label htmlFor="name">Nama Jadwal</Label>
+                <Input
+                  id="name"
+                  placeholder="Contoh: Jadwal Reguler Semester Genap 2025/2026"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="type">Tipe Jadwal</Label>
+                <select
+                  id="type"
+                  value={groupType}
+                  onChange={(e) => setGroupType(e.target.value)}
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="reguler">Perkuliahan Reguler</option>
+                  <option value="uts">Ujian Tengah Semester (UTS)</option>
+                  <option value="uas">Ujian Akhir Semester (UAS)</option>
+                  <option value="libur">Pekan Libur / Kosong</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="file">File Excel (.xlsx)</Label>
+                <div className="mt-1">
+                  <Input
+                    id="file"
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-background rounded p-3">
-                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                  {uploadResult.slotsImported}
-                </p>
-                <p className="text-xs text-muted-foreground">Slot berhasil diimpor</p>
-              </div>
-              <div className="bg-background rounded p-3">
-                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                  {uploadResult.lecturersLinked}
-                </p>
-                <p className="text-xs text-muted-foreground">Jadwal dosen terhubung</p>
-              </div>
+            <div className="flex justify-end gap-3 mt-8">
+              <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)} disabled={isUploading}>
+                Batal
+              </Button>
+              <Button onClick={processUpload} disabled={isUploading || !selectedFile || !groupName} className="min-w-[120px]">
+                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Proses & Unggah'}
+              </Button>
             </div>
-
-            {uploadResult.coursesNotFound.length > 0 && (
-              <div className="mt-4 p-3 rounded bg-amber-100 dark:bg-amber-900/30">
-                <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
-                  Mata kuliah tidak ditemukan (dilewati):
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {uploadResult.coursesNotFound.map((name) => (
-                    <Badge key={name} variant="outline" className="text-xs">
-                      {name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {uploadResult.lecturersNotFound && uploadResult.lecturersNotFound.length > 0 && (
-              <div className="mt-4 p-3 rounded bg-amber-100 dark:bg-amber-900/30">
-                <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
-                  Nama dosen tidak ditemukan:
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {uploadResult.lecturersNotFound.map((name) => (
-                    <Badge key={name} variant="outline" className="text-xs">
-                      {name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => setUploadResult(null)}>
-              Tutup Hasil
-            </Button>
           </div>
         </div>
       )}
-
-      {/* Existing Schedules Table */}
-      <div className="mt-12 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Jadwal Kuliah Tersimpan ({existingSchedules?.length || 0})</h2>
-        </div>
-        <p className="text-sm text-muted-foreground mb-4">
-          Berikut adalah jadwal kuliah yang saat ini aktif dan digunakan sistem untuk kalkulasi penjadwalan seminar.
-        </p>
-
-        <div className="rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto max-h-[500px]">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 sticky top-0">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Dosen</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Hari</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Waktu</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Mata Kuliah / Aktivitas</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground">Ruang</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {existingSchedules === undefined ? (
-                  [...Array(5)].map((_, i) => (
-                    <tr key={i}>
-                      <td className="px-4 py-3"><Skeleton className="h-4 w-32" /></td>
-                      <td className="px-4 py-3"><Skeleton className="h-4 w-20" /></td>
-                      <td className="px-4 py-3"><Skeleton className="h-4 w-24" /></td>
-                      <td className="px-4 py-3"><Skeleton className="h-4 w-40" /></td>
-                      <td className="px-4 py-3"><Skeleton className="h-4 w-16" /></td>
-                    </tr>
-                  ))
-                ) : existingSchedules.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                      <FileText className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                      Belum ada jadwal yang diunggah
-                    </td>
-                  </tr>
-                ) : (
-                  existingSchedules.map((schedule) => (
-                    <tr key={schedule._id} className="hover:bg-muted/50 transition-colors bg-background">
-                      <td className="px-4 py-3 font-medium">
-                        {schedule.lecturer?.name || 'Dosen Tidak Ditemukan'}
-                      </td>
-                      <td className="px-4 py-3">{schedule.day}</td>
-                      <td className="px-4 py-3 font-mono text-xs">
-                        {schedule.startTime} - {schedule.endTime}
-                      </td>
-                      <td className="px-4 py-3">
-                        {schedule.activity || schedule.course?.name || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {schedule.room || '-'}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

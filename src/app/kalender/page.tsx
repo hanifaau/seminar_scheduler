@@ -267,12 +267,7 @@ export default function KalenderPage() {
                                   <Clock className="h-4 w-4" />
                                   {schedule.startTime} - {schedule.endTime}
                                </div>
-                               {schedule.course && (
-                                 <Badge variant="outline" className="text-amber-700 border-amber-300">
-                                   {schedule.course.sks} SKS
-                                 </Badge>
-                               )}
-                            </div>
+                               </div>
                             
                             <div>
                                <p className="font-semibold text-foreground text-sm">{schedule.activity}</p>

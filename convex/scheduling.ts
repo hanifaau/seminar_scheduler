@@ -97,10 +97,21 @@ async function getLecturerBusySlotsForDay(
     .withIndex('by_lecturer', (q: any) => q.eq('lecturerId', lecturerId))
     .collect();
 
+  // Get active schedule groups
+  const activeGroups = await ctx.db
+    .query('schedule_groups')
+    .withIndex('by_active', (q: any) => q.eq('isActive', true))
+    .collect();
+  const activeGroupIds = new Set(activeGroups.map((g: any) => g._id.toString()));
+
   const lecturer = await ctx.db.get(lecturerId);
   const lecturerName = lecturer?.name || 'Dosen';
 
-  const daySchedules = schedules.filter((s: any) => parseDayName(s.day) === parseDayName(day));
+  const daySchedules = schedules.filter((s: any) => {
+    const isSameDay = parseDayName(s.day) === parseDayName(day);
+    const isActive = s.groupId ? activeGroupIds.has(s.groupId.toString()) : true; // keep legacy schedules active
+    return isSameDay && isActive;
+  });
 
   return daySchedules.map((s: any) => ({
     startTime: timeToMinutes(s.startTime) - TRANSITION_GAP, // Add buffer before
@@ -593,6 +604,13 @@ export const checkSlotAvailability = query({
     // Check each lecturer's schedule
     const dayName = parseDayName(new Date(args.date).toLocaleDateString('en-US', { weekday: 'long' }));
 
+    // Get active schedule groups
+    const activeGroups = await ctx.db
+      .query('schedule_groups')
+      .withIndex('by_active', (q: any) => q.eq('isActive', true))
+      .collect();
+    const activeGroupIds = new Set(activeGroups.map((g: any) => g._id.toString()));
+
     for (const lecturerId of lecturerIds) {
       const schedules = await ctx.db
         .query('teaching_schedules')
@@ -603,6 +621,7 @@ export const checkSlotAvailability = query({
 
       for (const schedule of schedules) {
         if (parseDayName(schedule.day) !== dayName) continue;
+        if (schedule.groupId && !activeGroupIds.has(schedule.groupId.toString())) continue;
 
         const scheduleStart = timeToMinutes(schedule.startTime);
         const scheduleEnd = timeToMinutes(schedule.endTime);
@@ -679,11 +698,22 @@ export const getAvailableRooms = query({
     const dayNameDate = new Date(args.date).toLocaleDateString('en-US', { weekday: 'long' });
     const dayName = parseDayName(dayNameDate);
 
-    // 2. Fetch teaching schedules for this day
-    const daySchedules = await ctx.db
+    // 2. Fetch active schedule groups
+    const activeGroups = await ctx.db
+      .query('schedule_groups')
+      .withIndex('by_active', (q) => q.eq('isActive', true))
+      .collect();
+    const activeGroupIds = new Set(activeGroups.map((g: any) => g._id.toString()));
+
+    // 3. Fetch teaching schedules for this day
+    const daySchedulesRaw = await ctx.db
       .query('teaching_schedules')
       .withIndex('by_day', (q) => q.eq('day', dayName))
       .collect();
+
+    const daySchedules = daySchedulesRaw.filter((s: any) => 
+      s.groupId ? activeGroupIds.has(s.groupId.toString()) : true
+    );
 
     const usedRoomsInClasses = new Set<string>();
 

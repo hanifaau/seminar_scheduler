@@ -1,7 +1,68 @@
 import { query, mutation } from './_generated/server';
 import { v } from 'convex/values';
 
-// Get a single schedule by ID
+// --- GROUP MANAGEMENT ---
+
+export const getGroups = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query('schedule_groups').order('desc').collect();
+  },
+});
+
+export const createGroup = mutation({
+  args: {
+    name: v.string(),
+    type: v.string(),
+    isActive: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert('schedule_groups', {
+      name: args.name,
+      type: args.type,
+      isActive: args.isActive,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const toggleGroupActive = mutation({
+  args: {
+    id: v.id('schedule_groups'),
+    isActive: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      isActive: args.isActive,
+      updatedAt: Date.now(),
+    });
+    return args.id;
+  },
+});
+
+export const deleteGroup = mutation({
+  args: {
+    id: v.id('schedule_groups'),
+  },
+  handler: async (ctx, args) => {
+    // Delete all schedules associated with this group
+    const schedules = await ctx.db
+      .query('teaching_schedules')
+      .withIndex('by_group', (q) => q.eq('groupId', args.id))
+      .collect();
+
+    for (const schedule of schedules) {
+      await ctx.db.delete(schedule._id);
+    }
+
+    // Delete the group itself
+    await ctx.db.delete(args.id);
+    return args.id;
+  },
+});
+
+// --- SCHEDULE MANAGEMENT ---
+
 export const get = query({
   args: { id: v.id('teaching_schedules') },
   handler: async (ctx, args) => {
@@ -9,7 +70,6 @@ export const get = query({
   },
 });
 
-// Get all schedules
 export const getAll = query({
   args: {},
   handler: async (ctx) => {
@@ -17,11 +77,10 @@ export const getAll = query({
   },
 });
 
-// Create a new schedule entry
 export const create = mutation({
   args: {
     lecturerId: v.id('lecturers'),
-    courseId: v.optional(v.id('courses')),
+    groupId: v.optional(v.id('schedule_groups')),
     day: v.string(),
     shiftId: v.optional(v.string()),
     startTime: v.string(),
@@ -32,27 +91,17 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const scheduleId = await ctx.db.insert('teaching_schedules', {
-      lecturerId: args.lecturerId,
-      courseId: args.courseId,
-      day: args.day,
-      shiftId: args.shiftId,
-      startTime: args.startTime,
-      endTime: args.endTime,
-      activity: args.activity,
-      room: args.room,
-      notes: args.notes,
+    return await ctx.db.insert('teaching_schedules', {
+      ...args,
       createdAt: now,
     });
-    return scheduleId;
   },
 });
 
-// Create schedule with validation (for manual scheduling)
 export const createWithValidation = mutation({
   args: {
     lecturerId: v.id('lecturers'),
-    courseId: v.optional(v.id('courses')),
+    groupId: v.optional(v.id('schedule_groups')),
     day: v.string(),
     shiftId: v.optional(v.string()),
     startTime: v.string(),
@@ -62,13 +111,11 @@ export const createWithValidation = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Helper function to convert time to minutes
     const toMinutes = (time: string): number => {
       const [hours, minutes] = time.split(':').map(Number);
       return hours * 60 + minutes;
     };
 
-    // Check for lecturer conflicts
     const lecturerSchedules = await ctx.db
       .query('teaching_schedules')
       .withIndex('by_lecturer_day', (q) =>
@@ -83,7 +130,6 @@ export const createWithValidation = mutation({
       const existingStart = toMinutes(schedule.startTime);
       const existingEnd = toMinutes(schedule.endTime);
 
-      // Check for overlap
       if (newStart < existingEnd && newEnd > existingStart) {
         throw new Error(
           `Dosen sudah memiliki jadwal "${schedule.activity}" pada ${args.day} (${schedule.startTime} - ${schedule.endTime})`
@@ -91,7 +137,6 @@ export const createWithValidation = mutation({
       }
     }
 
-    // Check for room conflicts if room is specified
     if (args.room) {
       const allSchedules = await ctx.db
         .query('teaching_schedules')
@@ -106,7 +151,6 @@ export const createWithValidation = mutation({
         const existingStart = toMinutes(schedule.startTime);
         const existingEnd = toMinutes(schedule.endTime);
 
-        // Check for overlap
         if (newStart < existingEnd && newEnd > existingStart) {
           throw new Error(
             `Ruangan ${args.room} sudah digunakan pada ${args.day} (${schedule.startTime} - ${schedule.endTime})`
@@ -115,61 +159,19 @@ export const createWithValidation = mutation({
       }
     }
 
-    // No conflicts, create schedule
     const now = Date.now();
-    const scheduleId = await ctx.db.insert('teaching_schedules', {
-      lecturerId: args.lecturerId,
-      courseId: args.courseId,
-      day: args.day,
-      shiftId: args.shiftId,
-      startTime: args.startTime,
-      endTime: args.endTime,
-      activity: args.activity,
-      room: args.room,
-      notes: args.notes,
+    return await ctx.db.insert('teaching_schedules', {
+      ...args,
       createdAt: now,
     });
-
-    return scheduleId;
   },
 });
 
-// Bulk insert schedule entries
-export const bulkInsert = mutation({
-  args: {
-    schedules: v.array(
-      v.object({
-        lecturerId: v.id('lecturers'),
-        day: v.string(),
-        startTime: v.string(),
-        endTime: v.string(),
-        activity: v.string(),
-        room: v.optional(v.string()),
-        notes: v.optional(v.string()),
-      })
-    ),
-  },
-  handler: async (ctx, args) => {
-    const now = Date.now();
-    const insertedIds = [];
-
-    for (const schedule of args.schedules) {
-      const id = await ctx.db.insert('teaching_schedules', {
-        ...schedule,
-        createdAt: now,
-      });
-      insertedIds.push(id);
-    }
-
-    return insertedIds;
-  },
-});
-
-// Update a schedule entry
 export const update = mutation({
   args: {
     id: v.id('teaching_schedules'),
     lecturerId: v.optional(v.id('lecturers')),
+    groupId: v.optional(v.id('schedule_groups')),
     day: v.optional(v.string()),
     startTime: v.optional(v.string()),
     endTime: v.optional(v.string()),
@@ -189,7 +191,6 @@ export const update = mutation({
       updatedAt: Date.now(),
     };
 
-    // Remove undefined values
     Object.keys(updateData).forEach(
       (key) => updateData[key] === undefined && delete updateData[key]
     );
@@ -199,7 +200,6 @@ export const update = mutation({
   },
 });
 
-// Remove a schedule entry
 export const remove = mutation({
   args: { id: v.id('teaching_schedules') },
   handler: async (ctx, args) => {
@@ -212,31 +212,6 @@ export const remove = mutation({
   },
 });
 
-// Get schedules by lecturer ID
-export const getByLecturer = query({
-  args: { lecturerId: v.id('lecturers') },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query('teaching_schedules')
-      .withIndex('by_lecturer', (q) => q.eq('lecturerId', args.lecturerId))
-      .order('asc')
-      .collect();
-  },
-});
-
-// Get schedules by day
-export const getByDay = query({
-  args: { day: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query('teaching_schedules')
-      .withIndex('by_day', (q) => q.eq('day', args.day))
-      .order('asc')
-      .collect();
-  },
-});
-
-// Get all schedules with lecturer details
 export const getAllWithLecturer = query({
   args: {},
   handler: async (ctx) => {
@@ -248,11 +223,11 @@ export const getAllWithLecturer = query({
     const schedulesWithLecturer = await Promise.all(
       schedules.map(async (schedule) => {
         const lecturer = await ctx.db.get(schedule.lecturerId);
-        const course = schedule.courseId ? await ctx.db.get(schedule.courseId) : null;
+        const group = schedule.groupId ? await ctx.db.get(schedule.groupId) : null;
         return {
           ...schedule,
           lecturer,
-          course,
+          group,
         };
       })
     );
@@ -261,7 +236,6 @@ export const getAllWithLecturer = query({
   },
 });
 
-// Get schedules by lecturer and day (for conflict checking)
 export const getByLecturerAndDay = query({
   args: {
     lecturerId: v.id('lecturers'),
@@ -277,25 +251,6 @@ export const getByLecturerAndDay = query({
   },
 });
 
-// Get schedules by room and day (for conflict checking)
-export const getByRoomAndDay = query({
-  args: {
-    room: v.string(),
-    day: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const allSchedules = await ctx.db
-      .query('teaching_schedules')
-      .withIndex('by_day', (q) => q.eq('day', args.day))
-      .collect();
-
-    return allSchedules.filter(
-      (s) => s.room?.toLowerCase() === args.room.toLowerCase()
-    );
-  },
-});
-
-// Remove all schedules for a lecturer
 export const removeAllByLecturer = mutation({
   args: { lecturerId: v.id('lecturers') },
   handler: async (ctx, args) => {
@@ -312,18 +267,19 @@ export const removeAllByLecturer = mutation({
   },
 });
 
-// Import course schedules from MINIMALIST CSV with AUTO-MAPPING
-// Format: Hari, Waktu, Mata Kuliah, Ruang, Dosen
-// Logic: Find course by name, match lecturer names, and create schedules only for matched lecturers
-export const importFromMinimalistCSV = mutation({
+// --- SMART IMPORT LOGIC ---
+
+export const importSmartSchedule = mutation({
   args: {
+    groupId: v.id('schedule_groups'),
     schedules: v.array(
       v.object({
-        day: v.string(),           // e.g., "Senin"
-        time: v.string(),          // e.g., "07.30 - 09.10"
-        courseName: v.string(),    // Must match EXACTLY with Master Course name
-        room: v.optional(v.string()),      // e.g., "Lab. Komputer 1"
-        lecturerNames: v.optional(v.string()), // Must be provided by CSV, optional fallback
+        day: v.string(),
+        startTime: v.string(),
+        endTime: v.string(),
+        activity: v.string(),
+        room: v.optional(v.string()),
+        lecturerNames: v.string(),
       })
     ),
   },
@@ -331,31 +287,13 @@ export const importFromMinimalistCSV = mutation({
     const now = Date.now();
     let slotsImported = 0;
     let lecturersLinked = 0;
-    let coursesNotFound: string[] = [];
     let lecturersNotFound: string[] = [];
     let duplicatesSkipped = 0;
 
-    // Build course name -> course mapping
-    const allCourses = await ctx.db.query('courses').collect();
-    const courseMap = new Map<string, typeof allCourses[0]>();
-    for (const course of allCourses) {
-      courseMap.set(course.name.toLowerCase().trim(), course);
-    }
-
     // Get all lecturers and build lookup maps
     const allLecturers = await ctx.db.query('lecturers').collect();
-    const lecturerIdMap = new Map<string, typeof allLecturers[0]>();
-    for (const lecturer of allLecturers) {
-      lecturerIdMap.set(lecturer._id.toString(), lecturer);
-    }
 
-    // Hapus semua jadwal yang sudah ada (Sistem Tiban/Ganti Total)
-    const existingSchedules = await ctx.db.query('teaching_schedules').collect();
-    for (const schedule of existingSchedules) {
-      await ctx.db.delete(schedule._id);
-    }
-    
-    // Set ini tetap digunakan untuk mencegah duplikat di dalam CSV yang sama
+    // Prevent duplicates within the same import execution
     const scheduleKeys = new Set<string>();
 
     const parseLecturerKeywords = (names: string) =>
@@ -364,102 +302,52 @@ export const importFromMinimalistCSV = mutation({
         .map((name) => name.trim())
         .filter(Boolean);
 
-    // Process each schedule entry
     for (const scheduleData of args.schedules) {
-      const { day, time, courseName, room, lecturerNames } = scheduleData;
-      const lecturerNamesTrimmed = lecturerNames ? lecturerNames.trim() : '';
+      const { day, startTime, endTime, activity, room, lecturerNames } = scheduleData;
+      const lecturerNamesTrimmed = lecturerNames.trim();
 
-      // Parse time range (format: "07.30 - 09.10" or "07:30-09:10")
-      const timeParts = time.split('-').map((t) => t.trim());
-      if (timeParts.length !== 2) {
-        console.log(`[Import] Invalid time format: ${time}`);
-        continue;
-      }
-      const [startTime, endTime] = timeParts;
+      if (!lecturerNamesTrimmed) continue;
 
-      // Find course by name (exact match, case-insensitive)
-      const course = courseMap.get(courseName.toLowerCase().trim());
+      const keywords = parseLecturerKeywords(lecturerNamesTrimmed);
+      const matchedLecturerIds = new Set<string>();
 
-      if (!course) {
-        if (!coursesNotFound.includes(courseName)) {
-          coursesNotFound.push(courseName);
-        }
-        continue;
-      }
-
-      const courseLecturerIds = new Set(
-        (course.lecturerIds || []).map((lecturerId) => lecturerId.toString())
-      );
-
-      let targetLecturerIds: any[] = [];
-
-      if (!lecturerNamesTrimmed) {
-        // Fallback: use all course lecturers
-        targetLecturerIds = Array.from(courseLecturerIds).map(
-          (id) => lecturerIdMap.get(id)!._id
-        );
-      } else {
-        const keywords = parseLecturerKeywords(lecturerNamesTrimmed);
-        const matchedIds = new Set<string>();
-
-        for (const keyword of keywords) {
-          const matches = allLecturers.filter((lecturer) =>
-            lecturer.name.toLowerCase().includes(keyword.toLowerCase())
-          );
-
-          if (matches.length === 0) {
-            if (!lecturersNotFound.includes(keyword)) {
-              lecturersNotFound.push(keyword);
-            }
-            continue;
-          }
-
-          for (const lecturer of matches) {
-            const lecturerIdString = lecturer._id.toString();
-            if (courseLecturerIds.size === 0 || courseLecturerIds.has(lecturerIdString)) {
-              matchedIds.add(lecturerIdString);
-            }
-          }
-        }
-
-        const matchedLecturerIds = Array.from(matchedIds).map(
-          (id) => lecturerIdMap.get(id)!._id
+      for (const keyword of keywords) {
+        const matches = allLecturers.filter((lecturer) =>
+          lecturer.name.toLowerCase().includes(keyword.toLowerCase())
         );
 
-        if (matchedLecturerIds.length === 0) {
-          console.log(
-            `[Import] Course "${courseName}" has no matching lecturers for specified names: ${lecturerNamesTrimmed}`
-          );
+        if (matches.length === 0) {
+          if (!lecturersNotFound.includes(keyword)) {
+            lecturersNotFound.push(keyword);
+          }
           continue;
         }
 
-        targetLecturerIds = matchedLecturerIds;
+        for (const lecturer of matches) {
+          matchedLecturerIds.add(lecturer._id.toString());
+        }
       }
 
-      if (targetLecturerIds.length === 0) {
-        console.log(
-          `[Import] Course "${courseName}" has no lecturers assigned or no matching lecturer names for ${lecturerNames}`
-        );
-        continue;
+      if (matchedLecturerIds.size === 0) {
+        continue; // No valid lecturers found for this row
       }
 
-      // Create schedule entry for each lecturer
-      for (const lecturerId of targetLecturerIds) {
-        // Check for duplicate
+      for (const lecturerIdStr of Array.from(matchedLecturerIds)) {
+        const lecturerId = lecturerIdStr as any;
+
         const scheduleKey = `${lecturerId}-${day}-${startTime}-${endTime}`;
         if (scheduleKeys.has(scheduleKey)) {
           duplicatesSkipped++;
           continue;
         }
 
-        // Create schedule entry
         await ctx.db.insert('teaching_schedules', {
           lecturerId: lecturerId,
-          courseId: course._id,
+          groupId: args.groupId,
           day,
           startTime,
           endTime,
-          activity: course.name,
+          activity,
           room: room || undefined,
           createdAt: now,
         });
@@ -471,129 +359,12 @@ export const importFromMinimalistCSV = mutation({
       slotsImported++;
     }
 
-    console.log(`[Import] Complete: ${slotsImported} slots, ${lecturersLinked} lecturer schedules`);
-
     return {
       slotsImported,
       lecturersLinked,
-      coursesNotFound,
       lecturersNotFound,
       duplicatesSkipped,
-      message: `${slotsImported} slot berhasil diimpor dan dihubungkan ke ${lecturersLinked} jadwal dosen`,
+      message: `${slotsImported} slot berhasil diimpor ke grup jadwal, terhubung ke ${lecturersLinked} sesi dosen.`,
     };
-  },
-});
-
-// Legacy import - kept for backwards compatibility
-// Import course schedules from CSV (handles 3 lecturer columns)
-// Auto-creates lecturers if NIP doesn't exist
-// Prevents duplicate entries
-export const importCourseSchedule = mutation({
-  args: {
-    schedules: v.array(
-      v.object({
-        day: v.string(),
-        startTime: v.string(),
-        endTime: v.string(),
-        courseName: v.string(),
-        room: v.string(),
-        lecturerNIPs: v.array(v.string()),
-      })
-    ),
-  },
-  handler: async (ctx, args) => {
-    const now = Date.now();
-    let schedulesCreated = 0;
-    let lecturersCreated = 0;
-    const lecturerCache = new Map<string, string>(); // NIP -> lecturerId
-
-    // Get all existing lecturers to build cache
-    const existingLecturers = await ctx.db.query('lecturers').collect();
-    for (const lecturer of existingLecturers) {
-      lecturerCache.set(lecturer.nip, lecturer._id);
-    }
-
-    // Get all existing schedules to check for duplicates
-    const existingSchedules = await ctx.db.query('teaching_schedules').collect();
-    const scheduleKeys = new Set<string>();
-
-    for (const schedule of existingSchedules) {
-      // Create a unique key for each schedule: lecturerId-day-startTime-endTime
-      const key = `${schedule.lecturerId}-${schedule.day}-${schedule.startTime}-${schedule.endTime}`;
-      scheduleKeys.add(key);
-    }
-
-    // Process each schedule entry
-    for (const scheduleData of args.schedules) {
-      const { day, startTime, endTime, courseName, room, lecturerNIPs } = scheduleData;
-
-      // Process each lecturer in the schedule
-      for (const nip of lecturerNIPs) {
-        if (!nip || nip === '-' || nip === '') continue;
-
-        // Get or create lecturer
-        let lecturerId = lecturerCache.get(nip);
-
-        if (!lecturerId) {
-          // Create new lecturer with placeholder name
-          lecturerId = await ctx.db.insert('lecturers', {
-            name: `Dosen ${nip}`,
-            nip: nip,
-            expertise: [],
-            status: 'active',
-            createdAt: now,
-          });
-          lecturerCache.set(nip, lecturerId);
-          lecturersCreated++;
-        }
-
-        // Check for duplicate
-        const scheduleKey = `${lecturerId}-${day}-${startTime}-${endTime}`;
-        if (scheduleKeys.has(scheduleKey)) {
-          // Skip duplicate
-          continue;
-        }
-
-        // Create schedule entry
-        await ctx.db.insert('teaching_schedules', {
-          lecturerId: lecturerId as any,
-          day,
-          startTime,
-          endTime,
-          activity: courseName,
-          room: room || undefined,
-          notes: undefined,
-          createdAt: now,
-        });
-
-        scheduleKeys.add(scheduleKey);
-        schedulesCreated++;
-      }
-    }
-
-    return {
-      schedulesCreated,
-      lecturersCreated,
-    };
-  },
-});
-
-// Cleanup orphaned schedules (where lecturer no longer exists)
-export const cleanupOrphanedSchedules = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const schedules = await ctx.db.query('teaching_schedules').collect();
-    let deletedCount = 0;
-
-    for (const schedule of schedules) {
-      const lecturer = await ctx.db.get(schedule.lecturerId);
-      // Jika dosen tidak ada (null), berarti jadwal ini orphaned data
-      if (!lecturer) {
-        await ctx.db.delete(schedule._id);
-        deletedCount++;
-      }
-    }
-
-    return { deletedCount, message: `Berhasil membersihkan ${deletedCount} jadwal mengajar yatim piatu.` };
   },
 });
