@@ -203,7 +203,7 @@ export const sendSeminarNotifications = action({
       throw new Error('Permohonan seminar tidak ditemukan');
     }
 
-    if (seminarRequest.status !== 'scheduled') {
+    if (seminarRequest.status !== 'scheduled' && seminarRequest.status !== 'waiting_confirmation') {
       throw new Error('Seminar belum dijadwalkan');
     }
 
