@@ -212,31 +212,47 @@ export const sendSeminarNotifications = action({
     const examiners = [];
 
     if (seminarRequest.supervisor1Id) {
-      const supervisor1 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.supervisor1Id });
-      if (supervisor1) {
-        lecturers.push({ name: supervisor1.name, phone: supervisor1.phone, role: 'Pembimbing Utama' });
-        supervisors.push(supervisor1.name);
+      try {
+        const supervisor1 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.supervisor1Id as any });
+        if (supervisor1) {
+          lecturers.push({ name: supervisor1.name, phone: supervisor1.phone, role: 'Pembimbing Utama' });
+          supervisors.push(supervisor1.name);
+        }
+      } catch (e) {
+        console.error('Failed to get supervisor 1:', e);
       }
     }
     if (seminarRequest.supervisor2Id) {
-      const supervisor2 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.supervisor2Id });
-      if (supervisor2) {
-        lecturers.push({ name: supervisor2.name, phone: supervisor2.phone, role: 'Pembimbing Pendamping' });
-        supervisors.push(supervisor2.name);
+      try {
+        const supervisor2 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.supervisor2Id as any });
+        if (supervisor2) {
+          lecturers.push({ name: supervisor2.name, phone: supervisor2.phone, role: 'Pembimbing Pendamping' });
+          supervisors.push(supervisor2.name);
+        }
+      } catch (e) {
+        console.error('Failed to get supervisor 2:', e);
       }
     }
     if (seminarRequest.examiner1Id) {
-      const examiner1 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.examiner1Id });
-      if (examiner1) {
-        lecturers.push({ name: examiner1.name, phone: examiner1.phone, role: 'Penguji 1' });
-        examiners.push(examiner1.name);
+      try {
+        const examiner1 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.examiner1Id as any });
+        if (examiner1) {
+          lecturers.push({ name: examiner1.name, phone: examiner1.phone, role: 'Penguji 1' });
+          examiners.push(examiner1.name);
+        }
+      } catch (e) {
+        console.error('Failed to get examiner 1:', e);
       }
     }
     if (seminarRequest.examiner2Id) {
-      const examiner2 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.examiner2Id });
-      if (examiner2) {
-        lecturers.push({ name: examiner2.name, phone: examiner2.phone, role: 'Penguji 2' });
-        examiners.push(examiner2.name);
+      try {
+        const examiner2 = await ctx.runQuery(api.lecturers.get, { id: seminarRequest.examiner2Id as any });
+        if (examiner2) {
+          lecturers.push({ name: examiner2.name, phone: examiner2.phone, role: 'Penguji 2' });
+          examiners.push(examiner2.name);
+        }
+      } catch (e) {
+        console.error('Failed to get examiner 2:', e);
       }
     }
 
