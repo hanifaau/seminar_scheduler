@@ -521,7 +521,7 @@ export const scheduleSeminar = mutation({
       scheduledStartTime: args.scheduledStartTime,
       scheduledEndTime: args.scheduledEndTime,
       scheduledRoom: args.scheduledRoom,
-      status: 'scheduled',
+      status: 'waiting_confirmation',
       updatedAt: Date.now(),
     });
 
