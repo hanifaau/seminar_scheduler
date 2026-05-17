@@ -1,4 +1,4 @@
-import { action } from './_generated/server';
+import { action, query } from './_generated/server';
 import { v } from 'convex/values';
 import { api } from './_generated/api';
 
@@ -59,7 +59,7 @@ function buildWhatsAppMessage(payload: NotificationPayload): string {
     intro = `*REMINDER*\nSalam Bapak/Ibu..izin mengingatkan kembali terkait jadwal seminar mhs berikut ya Pak/Bu..`;
   }
 
-  const revisiLine = payload.messageType === 'revisi' ? `\n*REVISI ${payload.revisionCount || 1}* ` : '';
+  const revisiLine = payload.messageType === 'revisi' ? `\n*REVISI* ` : '';
 
   return `${intro} ${revisiLine}
 *Jadwal ${payload.seminarType} Offline* a.n. *${payload.studentName}* NIM *${payload.nim}*
@@ -183,6 +183,30 @@ export const sendWhatsAppNotification = action({
       };
     }
   },
+});
+
+export const checkTwilioConfig = query({
+  args: {},
+  handler: async () => {
+    return {
+      sid: !!process.env.TWILIO_ACCOUNT_SID,
+      token: !!process.env.TWILIO_AUTH_TOKEN,
+      phone: !!process.env.TWILIO_WHATSAPP_NUMBER,
+      all: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_NUMBER)
+    };
+  }
+});
+
+export const testTwilio = action({
+  args: { phone: v.string() },
+  handler: async (ctx, args) => {
+    try {
+      const res = await sendTwilioMessage(args.phone, "Test message dari Convex");
+      return { success: true, response: res };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
 });
 
 // Send notifications to all lecturers involved in a seminar
