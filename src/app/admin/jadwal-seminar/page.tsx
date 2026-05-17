@@ -168,10 +168,9 @@ export default function JadwalSeminarPage() {
   const handleSendReminder = async (requestId: string) => {
     setSendingReminderId(requestId);
     try {
-      await requestRevision({ id: requestId as any });
       const results = await sendSeminarNotifications({
         seminarRequestId: requestId as any,
-        messageType: 'revisi',
+        messageType: 'reminder',
       });
 
       const successCount = results.results.filter((r: NotificationResult) => r.success).length;
@@ -230,9 +229,10 @@ export default function JadwalSeminarPage() {
       if (sendNotification) {
         setIsSendingNotification(true);
         try {
+          const isRevision = (selectedRequest as any).revisionCount && (selectedRequest as any).revisionCount >= 1;
           const results = await sendSeminarNotifications({
             seminarRequestId: selectedRequest._id as any,
-            messageType: 'undangan',
+            messageType: isRevision ? 'revisi' : 'undangan',
           });
           setNotificationResults(results.results);
 
@@ -497,7 +497,7 @@ export default function JadwalSeminarPage() {
                         ) : (
                           <>
                             <Send className="h-3.5 w-3.5 mr-2" /> 
-                            Kirim Revisi Jadwal
+                            Kirim Reminder
                           </>
                         )}
                       </Button>

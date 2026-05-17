@@ -396,6 +396,7 @@ export const cancelSchedule = mutation({
       scheduledEndTime: undefined,
       scheduledRoom: undefined,
       status: 'allocated',
+      revisionCount: 1,
       updatedAt: Date.now(),
     });
 
