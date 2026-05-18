@@ -177,9 +177,10 @@ export default function JadwalSeminarPage() {
       const totalCount = results.results.length;
 
       if (results.success) {
-        toast.success(`Reminder WhatsApp berhasil dikirim ke ${successCount}/${totalCount} dosen`);
+        toast.success(`Notifikasi ${isRevision ? 'Revisi' : 'Reminder'} WhatsApp berhasil dikirim ke ${successCount}/${totalCount} dosen`);
       } else {
-        toast.warning(`Reminder terkirim ke ${successCount}/${totalCount} dosen. Beberapa gagal.`);
+        const errors = results.results?.filter((r: any) => !r.success).map((r: any) => r.message).join(', ');
+        toast.warning(`Beberapa notifikasi gagal: ${errors || 'Cek log'}`);
       }
     } catch (error: any) {
       console.error('Reminder error:', error);
@@ -242,7 +243,8 @@ export default function JadwalSeminarPage() {
           if (results.success) {
             toast.success(`Notifikasi WhatsApp berhasil dikirim ke ${successCount}/${totalCount} dosen`);
           } else {
-            toast.warning(`Notifikasi terkirim ke ${successCount}/${totalCount} dosen. Beberapa gagal.`);
+            const errors = results.results?.filter((r: any) => !r.success).map((r: any) => r.message).join(', ');
+            toast.warning(`Beberapa notifikasi gagal: ${errors || 'Cek log'}`);
           }
         } catch (notifError: any) {
           console.error('Notification error:', notifError);
