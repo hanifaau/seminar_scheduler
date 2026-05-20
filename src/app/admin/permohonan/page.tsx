@@ -254,7 +254,7 @@ export default function PermohonanSeminarPage() {
   };
 
   const isLoading = requests === undefined || lecturers === undefined;
-  const activeLecturers = lecturers?.filter((l) => l.status === 'active' || !l.status) || [];
+  const activeLecturers = lecturers?.filter((l) => l.status !== 'inactive') || [];
 
   // Filter out supervisor1 from supervisor2 options
   const supervisor2Options = activeLecturers.filter((l) => l._id !== formData.supervisor1Id);
@@ -501,7 +501,7 @@ export default function PermohonanSeminarPage() {
                   <SelectContent>
                     {activeLecturers.map((lecturer) => (
                       <SelectItem key={lecturer._id} value={lecturer._id}>
-                        {lecturer.name}
+                        {lecturer.name} {lecturer.status === 'on leave' ? '(Cuti)' : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -520,7 +520,7 @@ export default function PermohonanSeminarPage() {
                     <SelectItem value="none">Tidak Ada</SelectItem>
                     {supervisor2Options.map((lecturer) => (
                       <SelectItem key={lecturer._id} value={lecturer._id}>
-                        {lecturer.name}
+                        {lecturer.name} {lecturer.status === 'on leave' ? '(Cuti)' : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -552,7 +552,7 @@ export default function PermohonanSeminarPage() {
                           .filter(l => l._id !== formData.supervisor1Id && l._id !== formData.supervisor2Id)
                           .map((lecturer) => (
                             <SelectItem key={lecturer._id} value={lecturer._id}>
-                              {lecturer.name}
+                              {lecturer.name} {lecturer.status === 'on leave' ? '(Cuti)' : ''}
                             </SelectItem>
                         ))}
                       </SelectContent>
@@ -573,7 +573,7 @@ export default function PermohonanSeminarPage() {
                           .filter(l => l._id !== formData.supervisor1Id && l._id !== formData.supervisor2Id && l._id !== formData.examiner1Id)
                           .map((lecturer) => (
                             <SelectItem key={lecturer._id} value={lecturer._id}>
-                              {lecturer.name}
+                              {lecturer.name} {lecturer.status === 'on leave' ? '(Cuti)' : ''}
                             </SelectItem>
                         ))}
                       </SelectContent>
