@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/molecules/FilterDropdown';
+import { SearchableSelect } from '@/components/molecules/SearchableSelect';
 import { cn } from '@/lib/utils';
 
 // Skeleton components
@@ -259,6 +260,32 @@ export default function PermohonanSeminarPage() {
   // Filter out supervisor1 from supervisor2 options
   const supervisor2Options = activeLecturers.filter((l) => l._id !== formData.supervisor1Id);
 
+  const formatLecturerOption = (l: any) => ({
+    label: `${l.name} ${l.status === 'on leave' ? '(Cuti)' : ''}`,
+    value: l._id,
+  });
+
+  const activeLecturersOptions = activeLecturers.map(formatLecturerOption);
+  
+  const supervisor2DropdownOptions = [
+    { label: 'Tidak Ada', value: 'none' },
+    ...supervisor2Options.map(formatLecturerOption)
+  ];
+
+  const examiner1DropdownOptions = [
+    { label: 'Belum Ditentukan', value: 'none' },
+    ...activeLecturers
+      .filter(l => l._id !== formData.supervisor1Id && l._id !== formData.supervisor2Id)
+      .map(formatLecturerOption)
+  ];
+
+  const examiner2DropdownOptions = [
+    { label: 'Belum Ditentukan', value: 'none' },
+    ...activeLecturers
+      .filter(l => l._id !== formData.supervisor1Id && l._id !== formData.supervisor2Id && l._id !== formData.examiner1Id)
+      .map(formatLecturerOption)
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -487,44 +514,24 @@ export default function PermohonanSeminarPage() {
               </div>
               <div>
                 <Label htmlFor="supervisor1">Pembimbing Utama *</Label>
-                <Select
+                <SearchableSelect
+                  options={activeLecturersOptions}
                   value={formData.supervisor1Id}
                   onValueChange={(value) => {
-                    // Reset supervisor2 if it's the same as supervisor1
                     const newSupervisor2 = formData.supervisor2Id === value ? '' : formData.supervisor2Id;
                     setFormData({ ...formData, supervisor1Id: value, supervisor2Id: newSupervisor2 });
                   }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih pembimbing utama" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeLecturers.map((lecturer) => (
-                      <SelectItem key={lecturer._id} value={lecturer._id}>
-                        {lecturer.name} {lecturer.status === 'on leave' ? '(Cuti)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Pilih pembimbing utama"
+                />
               </div>
               <div>
                 <Label htmlFor="supervisor2">Pembimbing Pendamping (Opsional)</Label>
-                <Select
+                <SearchableSelect
+                  options={supervisor2DropdownOptions}
                   value={formData.supervisor2Id || "none"}
                   onValueChange={(value) => setFormData({ ...formData, supervisor2Id: value === "none" ? "" : value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih pembimbing pendamping (opsional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Tidak Ada</SelectItem>
-                    {supervisor2Options.map((lecturer) => (
-                      <SelectItem key={lecturer._id} value={lecturer._id}>
-                        {lecturer.name} {lecturer.status === 'on leave' ? '(Cuti)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Pilih pembimbing pendamping"
+                />
               </div>
               {editingRequest && (
                 <div className="pt-4 border-t space-y-4">
@@ -539,45 +546,21 @@ export default function PermohonanSeminarPage() {
                   )}
                   <div>
                     <Label htmlFor="examiner1">Penguji 1</Label>
-                    <Select
+                    <SearchableSelect
+                      options={examiner1DropdownOptions}
                       value={formData.examiner1Id || "none"}
                       onValueChange={(value) => setFormData({ ...formData, examiner1Id: value === "none" ? "" : value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih penguji 1 (opsional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Belum Ditentukan</SelectItem>
-                        {activeLecturers
-                          .filter(l => l._id !== formData.supervisor1Id && l._id !== formData.supervisor2Id)
-                          .map((lecturer) => (
-                            <SelectItem key={lecturer._id} value={lecturer._id}>
-                              {lecturer.name} {lecturer.status === 'on leave' ? '(Cuti)' : ''}
-                            </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Pilih penguji 1"
+                    />
                   </div>
                   <div>
                     <Label htmlFor="examiner2">Penguji 2</Label>
-                    <Select
+                    <SearchableSelect
+                      options={examiner2DropdownOptions}
                       value={formData.examiner2Id || "none"}
                       onValueChange={(value) => setFormData({ ...formData, examiner2Id: value === "none" ? "" : value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih penguji 2 (opsional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Belum Ditentukan</SelectItem>
-                        {activeLecturers
-                          .filter(l => l._id !== formData.supervisor1Id && l._id !== formData.supervisor2Id && l._id !== formData.examiner1Id)
-                          .map((lecturer) => (
-                            <SelectItem key={lecturer._id} value={lecturer._id}>
-                              {lecturer.name} {lecturer.status === 'on leave' ? '(Cuti)' : ''}
-                            </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Pilih penguji 2"
+                    />
                   </div>
                 </div>
               )}
