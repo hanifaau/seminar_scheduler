@@ -21,6 +21,7 @@ export default defineSchema({
     phone: v.optional(v.string()), // Phone number for WhatsApp notifications
     expertise: v.array(v.string()), // Array of expertise areas
     status: v.optional(v.string()), // e.g., "active", "on leave", "inactive"
+    activeReturnDate: v.optional(v.string()), // Tanggal kembali aktif setelah cuti (YYYY-MM-DD)
     role: v.optional(v.union(
       v.literal('dosen'),      // Regular lecturer
       v.literal('kaprodi'),    // Head of Department

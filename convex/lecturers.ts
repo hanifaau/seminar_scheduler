@@ -28,6 +28,7 @@ export const create = mutation({
     phone: v.optional(v.string()),
     expertise: v.optional(v.array(v.string())),
     status: v.optional(v.string()),
+    activeReturnDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Check if NIP already exists
@@ -47,6 +48,7 @@ export const create = mutation({
       phone: args.phone,
       expertise: args.expertise ?? [],
       status: args.status ?? 'active',
+      activeReturnDate: args.status === 'on leave' ? args.activeReturnDate : undefined,
       createdAt: now,
     });
     return lecturerId;
@@ -62,6 +64,7 @@ export const update = mutation({
     phone: v.optional(v.string()),
     expertise: v.optional(v.array(v.string())),
     status: v.optional(v.string()),
+    activeReturnDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
@@ -87,10 +90,21 @@ export const update = mutation({
       updatedAt: Date.now(),
     };
 
-    // Remove undefined values
-    Object.keys(updateData).forEach(
-      (key) => updateData[key] === undefined && delete updateData[key]
-    );
+    // If status is changed and it's not 'on leave', clear activeReturnDate
+    if (updates.status !== undefined && updates.status !== 'on leave') {
+      updateData.activeReturnDate = undefined;
+    } else if (updates.status === 'on leave' && updates.activeReturnDate === '') {
+      updateData.activeReturnDate = undefined;
+    }
+
+    // Remove undefined values EXCEPT activeReturnDate if we explicitly want to unset it
+    // Wait, in Convex patch, to remove a field we set it to undefined.
+    // If we delete it from the object, it won't be updated.
+    Object.keys(updateData).forEach((key) => {
+      if (updateData[key] === undefined && key !== 'activeReturnDate') {
+        delete updateData[key];
+      }
+    });
 
     await ctx.db.patch(id, updateData);
     return id;

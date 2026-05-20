@@ -299,12 +299,20 @@ export const getAvailableSlots = query({
       lecturerIds.push(seminarRequest.examiner2Id);
     }
 
-    // Get lecturer names
+    // Get lecturer data
     const lecturerNames: Record<string, string> = {};
+    let maxReturnDateStr: string | null = null;
+    
     for (const id of lecturerIds) {
       const lecturer = await ctx.db.get(id);
       if (lecturer) {
         lecturerNames[id] = lecturer.name;
+        if (lecturer.status === 'on leave' && (lecturer as any).activeReturnDate) {
+          const returnDate = (lecturer as any).activeReturnDate;
+          if (!maxReturnDateStr || returnDate > maxReturnDateStr) {
+            maxReturnDateStr = returnDate;
+          }
+        }
       }
     }
 
@@ -315,6 +323,14 @@ export const getAvailableSlots = query({
     // Seminars cannot be scheduled on the same day (suddenly). Minimum notice is H+1.
     const startDate = new Date();
     startDate.setDate(startDate.getDate() + 1); // Start from tomorrow
+
+    // If there is a return date that is further in the future than tomorrow, jump to it!
+    if (maxReturnDateStr) {
+      const returnDate = new Date(maxReturnDateStr);
+      if (returnDate > startDate) {
+        startDate.setTime(returnDate.getTime());
+      }
+    }
 
     // Generate dates for the targeted week
     const weekOffset = args.weekOffset || 0;

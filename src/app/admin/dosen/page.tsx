@@ -28,6 +28,7 @@ interface Lecturer {
   phone?: string;
   expertise: string[];
   status?: string;
+  activeReturnDate?: string;
 }
 
 // Skeleton components
@@ -109,6 +110,7 @@ export default function ManajemenDosenPage() {
     nip: '',
     phone: '',
     status: 'active',
+    activeReturnDate: '',
   });
 
   // Queries
@@ -152,10 +154,11 @@ export default function ManajemenDosenPage() {
         nip: formData.nip,
         phone: formData.phone || undefined,
         status: formData.status,
+        activeReturnDate: formData.status === 'on leave' ? (formData.activeReturnDate || undefined) : undefined,
       });
 
       toast.success('Dosen berhasil ditambahkan');
-      setFormData({ name: '', nip: '', phone: '', status: 'active' });
+      setFormData({ name: '', nip: '', phone: '', status: 'active', activeReturnDate: '' });
       setIsAddDialogOpen(false);
     } catch (error: any) {
       toast.error(error.message || 'Gagal menambahkan dosen');
@@ -172,11 +175,12 @@ export default function ManajemenDosenPage() {
         nip: formData.nip || undefined,
         phone: formData.phone || undefined,
         status: formData.status || undefined,
+        activeReturnDate: formData.status === 'on leave' ? (formData.activeReturnDate || undefined) : undefined,
       });
 
       toast.success('Data dosen berhasil diperbarui');
       setEditingDosen(null);
-      setFormData({ name: '', nip: '', phone: '', status: 'active' });
+      setFormData({ name: '', nip: '', phone: '', status: 'active', activeReturnDate: '' });
     } catch (error: any) {
       toast.error(error.message || 'Gagal memperbarui data dosen');
     }
@@ -200,6 +204,7 @@ export default function ManajemenDosenPage() {
       nip: lecturer.nip,
       phone: lecturer.phone || '',
       status: lecturer.status || 'active',
+      activeReturnDate: lecturer.activeReturnDate || '',
     });
   };
 
@@ -397,21 +402,28 @@ export default function ManajemenDosenPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge
-                        variant={
-                          lecturer.status === 'active'
-                            ? 'success'
+                      <div className="flex flex-col gap-1 items-start">
+                        <Badge
+                          variant={
+                            lecturer.status === 'active'
+                              ? 'success'
+                              : lecturer.status === 'on leave'
+                              ? 'warning'
+                              : 'secondary'
+                          }
+                        >
+                          {lecturer.status === 'active'
+                            ? 'Aktif'
                             : lecturer.status === 'on leave'
-                            ? 'warning'
-                            : 'secondary'
-                        }
-                      >
-                        {lecturer.status === 'active'
-                          ? 'Aktif'
-                          : lecturer.status === 'on leave'
-                          ? 'Cuti'
-                          : lecturer.status || 'Aktif'}
-                      </Badge>
+                            ? 'Cuti'
+                            : lecturer.status || 'Aktif'}
+                        </Badge>
+                        {lecturer.status === 'on leave' && lecturer.activeReturnDate && (
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                            s/d {new Date(lecturer.activeReturnDate).toLocaleDateString('id-ID')}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
@@ -490,6 +502,20 @@ export default function ManajemenDosenPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {formData.status === 'on leave' && (
+                <div>
+                  <Label htmlFor="activeReturnDate">Tanggal Kembali Aktif</Label>
+                  <Input
+                    id="activeReturnDate"
+                    type="date"
+                    value={formData.activeReturnDate}
+                    onChange={(e) => setFormData({ ...formData, activeReturnDate: e.target.value })}
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Sistem penjadwalan akan mencari slot mulai dari tanggal ini.
+                  </p>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 Kepakaran dapat diatur kemudian melalui menu "Atur Kepakaran"
               </p>
@@ -499,7 +525,7 @@ export default function ManajemenDosenPage() {
                 variant="outline"
                 onClick={() => {
                   setIsAddDialogOpen(false);
-                  setFormData({ name: '', nip: '', phone: '', status: 'active' });
+                  setFormData({ name: '', nip: '', phone: '', status: 'active', activeReturnDate: '' });
                 }}
               >
                 Batal
@@ -558,6 +584,20 @@ export default function ManajemenDosenPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {formData.status === 'on leave' && (
+                <div>
+                  <Label htmlFor="edit-activeReturnDate">Tanggal Kembali Aktif</Label>
+                  <Input
+                    id="edit-activeReturnDate"
+                    type="date"
+                    value={formData.activeReturnDate}
+                    onChange={(e) => setFormData({ ...formData, activeReturnDate: e.target.value })}
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Sistem penjadwalan akan mencari slot mulai dari tanggal ini.
+                  </p>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 Untuk mengubah kepakaran, gunakan menu "Atur Kepakaran"
               </p>
@@ -567,7 +607,7 @@ export default function ManajemenDosenPage() {
                 variant="outline"
                 onClick={() => {
                   setEditingDosen(null);
-                  setFormData({ name: '', nip: '', phone: '', status: 'active' });
+                  setFormData({ name: '', nip: '', phone: '', status: 'active', activeReturnDate: '' });
                 }}
               >
                 Batal
