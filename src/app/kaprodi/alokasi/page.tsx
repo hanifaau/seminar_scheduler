@@ -90,11 +90,11 @@ export default function AlokasiPengujiPage() {
   // Filter lecturers by expertise
   const filteredLecturers = React.useMemo(() => {
     if (!lecturers) return [];
-    const active = lecturers.filter((l) => l.status === 'active' || !l.status);
+    const selectable = lecturers.filter((l) => l.status !== 'inactive');
 
-    if (expertiseFilter === 'semua') return active;
+    if (expertiseFilter === 'semua') return selectable;
 
-    return active.filter((l) =>
+    return selectable.filter((l) =>
       l.expertise.some((exp) =>
         exp.toLowerCase().includes(expertiseFilter.toLowerCase())
       )
@@ -197,11 +197,13 @@ export default function AlokasiPengujiPage() {
   const renderLecturerItem = (lecturer: Lecturer, isSelected: boolean) => {
     const supervisorLabel = getSupervisorLabel(lecturer._id);
     const isSup = isSupervisor(lecturer._id);
+    const isOnLeave = lecturer.status === 'on leave';
 
     return (
       <div className="flex flex-col gap-0.5">
         <span className={cn('flex items-center gap-1', isSup && 'text-muted-foreground')}>
           {lecturer.name}
+          {isOnLeave && <span className="text-yellow-600 font-medium text-xs">(Cuti)</span>}
           {isSup && (
             <Badge variant="warning" className="text-[10px] px-1 py-0">
               {supervisorLabel}
@@ -479,8 +481,11 @@ export default function AlokasiPengujiPage() {
                       <Badge variant={isSupervisor(examiner1Id) ? 'destructive' : 'success'} className="text-xs">
                         Penguji 1
                       </Badge>
-                      <span className="text-sm text-foreground">
+                      <span className="text-sm text-foreground flex items-center gap-1">
                         {displayedLecturers.find((l) => l._id === examiner1Id)?.name}
+                        {displayedLecturers.find((l) => l._id === examiner1Id)?.status === 'on leave' && (
+                          <span className="text-yellow-600 font-medium text-xs">(Cuti)</span>
+                        )}
                       </span>
                       {isSupervisor(examiner1Id) && (
                         <span className="text-xs text-destructive">
@@ -494,8 +499,11 @@ export default function AlokasiPengujiPage() {
                       <Badge variant={isSupervisor(examiner2Id) ? 'destructive' : 'success'} className="text-xs">
                         Penguji 2
                       </Badge>
-                      <span className="text-sm text-foreground">
+                      <span className="text-sm text-foreground flex items-center gap-1">
                         {displayedLecturers.find((l) => l._id === examiner2Id)?.name}
+                        {displayedLecturers.find((l) => l._id === examiner2Id)?.status === 'on leave' && (
+                          <span className="text-yellow-600 font-medium text-xs">(Cuti)</span>
+                        )}
                       </span>
                       {isSupervisor(examiner2Id) && (
                         <span className="text-xs text-destructive">
