@@ -561,7 +561,7 @@ export default function PermohonanSeminarPage() {
                       <Users className="h-5 w-5 text-primary" />
                       <h3 className="font-semibold text-foreground">Seksi Penguji Sidang</h3>
                     </div>
-                    <Link href="/kaprodi/alokasi">
+                    <Link href={`/kaprodi/alokasi?id=${editingRequest._id}`}>
                       <Button type="button" size="sm" variant="outline" className="flex items-center gap-1">
                         <Edit className="h-4 w-4" />
                         Revisi Penguji

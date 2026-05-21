@@ -18,6 +18,8 @@ import {
 } from '@/components/molecules/FilterDropdown';
 import { cn } from '@/lib/utils';
 
+import { useSearchParams } from 'next/navigation';
+
 // Skeleton components
 function Skeleton({ className }: { className?: string }) {
   return <div className={cn('skeleton', className)} />;
@@ -79,7 +81,10 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'secondary' | 'war
   completed: { label: 'Selesai', variant: 'default' },
 };
 
-export default function AlokasiPengujiPage() {
+function AlokasiPengujiContent() {
+  const searchParams = useSearchParams();
+  const idFromUrl = searchParams.get('id');
+
   const [selectedRequest, setSelectedRequest] = React.useState<SeminarRequest | null>(null);
   const [examiner1Id, setExaminer1Id] = React.useState<string>('');
   const [examiner2Id, setExaminer2Id] = React.useState<string>('');
@@ -91,6 +96,18 @@ export default function AlokasiPengujiPage() {
   const requests = useQuery(api.seminar_requests.getForAllocation);
   const lecturers = useQuery(api.lecturers.getAll);
   const expertiseCategories = useQuery(api.expertise_categories.getAll);
+
+  // Auto-select request if ID is in URL
+  React.useEffect(() => {
+    if (requests && idFromUrl && !selectedRequest) {
+      const targetRequest = requests.find(r => r._id === idFromUrl);
+      if (targetRequest) {
+        setSelectedRequest(targetRequest as SeminarRequest);
+        setExaminer1Id(targetRequest.examiner1Id || '');
+        setExaminer2Id(targetRequest.examiner2Id || '');
+      }
+    }
+  }, [requests, idFromUrl, selectedRequest]);
 
   // Mutations
   const allocateExaminers = useMutation(api.seminar_requests.allocateExaminers);
@@ -568,5 +585,17 @@ export default function AlokasiPengujiPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AlokasiPengujiPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <AlokasiPengujiContent />
+    </React.Suspense>
   );
 }
