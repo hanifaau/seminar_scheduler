@@ -113,13 +113,20 @@ export const update = mutation({
       const today = new Date().toISOString().split('T')[0];
       const returnDate = updateData.activeReturnDate as string | undefined;
 
-      // Find all scheduled seminars involving this lecturer
+      // Find all scheduled & waiting_confirmation seminars involving this lecturer
       const scheduledSeminars = await ctx.db
         .query('seminar_requests')
         .withIndex('by_status', (q) => q.eq('status', 'scheduled'))
         .collect();
+        
+      const waitingSeminars = await ctx.db
+        .query('seminar_requests')
+        .withIndex('by_status', (q) => q.eq('status', 'waiting_confirmation'))
+        .collect();
 
-      const overlappingSeminars = scheduledSeminars.filter(seminar => {
+      const allSeminarsToCancel = [...scheduledSeminars, ...waitingSeminars];
+
+      const overlappingSeminars = allSeminarsToCancel.filter(seminar => {
         if (!seminar.scheduledDate || seminar.scheduledDate < today) return false;
         
         // If return date is specified, only cancel if scheduledDate < returnDate
@@ -135,7 +142,7 @@ export const update = mutation({
 
       for (const seminar of overlappingSeminars) {
         await ctx.db.patch(seminar._id, {
-          status: 'waiting_confirmation',
+          status: 'allocated',
           scheduledDate: undefined,
           scheduledStartTime: undefined,
           scheduledEndTime: undefined,
