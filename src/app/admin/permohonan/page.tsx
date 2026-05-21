@@ -172,9 +172,9 @@ export default function PermohonanSeminarPage() {
           title: formData.title,
           type: formData.type,
           supervisor1Id: formData.supervisor1Id as any,
-          supervisor2Id: formData.supervisor2Id as any || undefined,
-          examiner1Id: formData.examiner1Id as any || undefined,
-          examiner2Id: formData.examiner2Id as any || undefined,
+          supervisor2Id: formData.supervisor2Id ? formData.supervisor2Id as any : null,
+          examiner1Id: formData.examiner1Id ? formData.examiner1Id as any : null,
+          examiner2Id: formData.examiner2Id ? formData.examiner2Id as any : null,
           notes: formData.notes || undefined,
         });
         toast.success('Permohonan berhasil diperbarui');

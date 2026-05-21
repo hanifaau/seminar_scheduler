@@ -200,9 +200,9 @@ export const update = mutation({
       v.literal('Sidang')
     )),
     supervisor1Id: v.optional(v.id('lecturers')),
-    supervisor2Id: v.optional(v.id('lecturers')),
-    examiner1Id: v.optional(v.id('lecturers')),
-    examiner2Id: v.optional(v.id('lecturers')),
+    supervisor2Id: v.optional(v.union(v.id('lecturers'), v.null())),
+    examiner1Id: v.optional(v.union(v.id('lecturers'), v.null())),
+    examiner2Id: v.optional(v.union(v.id('lecturers'), v.null())),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -218,17 +218,26 @@ export const update = mutation({
     };
 
     // Remove undefined values from updates (so we don't accidentally overwrite with undefined from frontend if not provided)
-    // Wait, if we want to delete examiner2Id, the frontend should send null or we handle it specially.
-    // For now, let's keep the frontend logic that sends undefined if not provided.
     Object.keys(updateData).forEach(
       (key) => updateData[key] === undefined && delete updateData[key]
     );
 
-    // Cek apakah ada perubahan pembimbing atau penguji
-    const supervisor1Changed = updateData.supervisor1Id && updateData.supervisor1Id !== existing.supervisor1Id;
-    const supervisor2Changed = (updateData.supervisor2Id && updateData.supervisor2Id !== existing.supervisor2Id) || (updateData.supervisor2Id === null && existing.supervisor2Id !== undefined);
-    const examiner1Changed = updateData.examiner1Id && updateData.examiner1Id !== existing.examiner1Id;
-    const examiner2Changed = (updateData.examiner2Id && updateData.examiner2Id !== existing.examiner2Id) || (updateData.examiner2Id === null && existing.examiner2Id !== undefined);
+    // Fungsi helper untuk mengecek perubahan dosen (menganggap null dan undefined sama-sama kosong)
+    const hasChanged = (newVal: any, oldVal: any) => {
+      // Jika newVal tidak ada di updateData, berarti tidak diubah (untuk parsial update)
+      if (newVal === undefined) return false;
+      
+      const isNewEmpty = newVal === null || newVal === undefined;
+      const isOldEmpty = oldVal === null || oldVal === undefined;
+      
+      if (isNewEmpty && isOldEmpty) return false;
+      return newVal !== oldVal;
+    };
+
+    const supervisor1Changed = hasChanged(updateData.supervisor1Id, existing.supervisor1Id);
+    const supervisor2Changed = hasChanged(updateData.supervisor2Id, existing.supervisor2Id);
+    const examiner1Changed = hasChanged(updateData.examiner1Id, existing.examiner1Id);
+    const examiner2Changed = hasChanged(updateData.examiner2Id, existing.examiner2Id);
 
     const lecturerChanged = supervisor1Changed || supervisor2Changed || examiner1Changed || examiner2Changed;
 
@@ -248,9 +257,9 @@ export const update = mutation({
     }
 
     // Convert nulls back to undefined for Convex patch to delete fields
-    if (updateData.examiner2Id === null) {
-      updateData.examiner2Id = undefined;
-    }
+    if (updateData.supervisor2Id === null) updateData.supervisor2Id = undefined;
+    if (updateData.examiner1Id === null) updateData.examiner1Id = undefined;
+    if (updateData.examiner2Id === null) updateData.examiner2Id = undefined;
 
     await ctx.db.patch(id, updateData);
     return id;
