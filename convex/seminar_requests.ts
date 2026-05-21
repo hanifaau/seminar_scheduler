@@ -224,23 +224,26 @@ export const update = mutation({
       (key) => updateData[key] === undefined && delete updateData[key]
     );
 
-    // Cek apakah ada perubahan penguji
+    // Cek apakah ada perubahan pembimbing atau penguji
+    const supervisor1Changed = updateData.supervisor1Id && updateData.supervisor1Id !== existing.supervisor1Id;
+    const supervisor2Changed = (updateData.supervisor2Id && updateData.supervisor2Id !== existing.supervisor2Id) || (updateData.supervisor2Id === null && existing.supervisor2Id !== undefined);
     const examiner1Changed = updateData.examiner1Id && updateData.examiner1Id !== existing.examiner1Id;
     const examiner2Changed = (updateData.examiner2Id && updateData.examiner2Id !== existing.examiner2Id) || (updateData.examiner2Id === null && existing.examiner2Id !== undefined);
 
-    if (examiner1Changed || examiner2Changed) {
-      // Jika statusnya scheduled, batalkan jadwalnya karena dosen berubah
-      if (existing.status === 'scheduled') {
+    const lecturerChanged = supervisor1Changed || supervisor2Changed || examiner1Changed || examiner2Changed;
+
+    if (lecturerChanged) {
+      // Jika statusnya scheduled atau waiting_confirmation, batalkan jadwalnya karena dosen berubah
+      if (existing.status === 'scheduled' || existing.status === 'waiting_confirmation') {
         updateData.scheduledDate = undefined;
         updateData.scheduledStartTime = undefined;
         updateData.scheduledEndTime = undefined;
         updateData.scheduledRoom = undefined;
         updateData.status = 'allocated';
-      } else if (existing.status === 'requested') {
+        updateData.revisionCount = (existing.revisionCount || 0) + 1;
+      } else if (existing.status === 'requested' && updateData.examiner1Id) {
         // Jika dari requested lalu diisi pengujinya, otomatis naik status
-        if (updateData.examiner1Id) {
-          updateData.status = 'allocated';
-        }
+        updateData.status = 'allocated';
       }
     }
 

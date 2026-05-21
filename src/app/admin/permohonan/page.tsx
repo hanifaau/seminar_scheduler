@@ -141,6 +141,27 @@ export default function PermohonanSeminarPage() {
       return;
     }
 
+    // Validasi dosen cuti
+    if (lecturers) {
+      const selectedLecturerIds = [
+        formData.supervisor1Id,
+        formData.supervisor2Id,
+        formData.examiner1Id,
+        formData.examiner2Id
+      ].filter(Boolean);
+      
+      const onLeaveLecturers = lecturers.filter(l => 
+        selectedLecturerIds.includes(l._id) && l.status === 'on leave'
+      );
+
+      if (onLeaveLecturers.length > 0) {
+        const names = onLeaveLecturers.map(l => l.name).join(', ');
+        if (!window.confirm(`PERINGATAN: Dosen berikut sedang dalam masa Cuti: ${names}.\n\nApakah Anda yakin tetap ingin mendaftarkan mereka pada permohonan ini?`)) {
+          return;
+        }
+      }
+    }
+
     setIsSubmitting(true);
     try {
       if (editingRequest) {
