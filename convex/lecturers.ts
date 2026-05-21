@@ -109,28 +109,23 @@ export const update = mutation({
     await ctx.db.patch(id, updateData);
 
     // ---- START AUTO CANCEL SCHEDULING ----
-    if (updates.status === 'on leave') {
+    if (updates.status === 'on leave' || updates.status === 'inactive') {
       const today = new Date().toISOString().split('T')[0];
       const returnDate = updateData.activeReturnDate as string | undefined;
 
-      // Find all scheduled & waiting_confirmation seminars involving this lecturer
-      const scheduledSeminars = await ctx.db
-        .query('seminar_requests')
-        .withIndex('by_status', (q) => q.eq('status', 'scheduled'))
-        .collect();
-        
-      const waitingSeminars = await ctx.db
-        .query('seminar_requests')
-        .withIndex('by_status', (q) => q.eq('status', 'waiting_confirmation'))
-        .collect();
+      // Find all relevant seminars
+      const scheduledSeminars = await ctx.db.query('seminar_requests').withIndex('by_status', (q) => q.eq('status', 'scheduled')).collect();
+      const waitingSeminars = await ctx.db.query('seminar_requests').withIndex('by_status', (q) => q.eq('status', 'waiting_confirmation')).collect();
+      const allocatedSeminars = await ctx.db.query('seminar_requests').withIndex('by_status', (q) => q.eq('status', 'allocated')).collect();
 
-      const allSeminarsToCancel = [...scheduledSeminars, ...waitingSeminars];
+      const allSeminarsToCancel = [...scheduledSeminars, ...waitingSeminars, ...allocatedSeminars];
 
       const overlappingSeminars = allSeminarsToCancel.filter(seminar => {
-        if (!seminar.scheduledDate || seminar.scheduledDate < today) return false;
+        // If it's scheduled but already passed, don't touch it
+        if (seminar.scheduledDate && seminar.scheduledDate < today) return false;
         
-        // If return date is specified, only cancel if scheduledDate < returnDate
-        if (returnDate && seminar.scheduledDate >= returnDate) return false;
+        // If on leave with a return date and the seminar is scheduled AFTER they return, don't cancel
+        if (updates.status === 'on leave' && returnDate && seminar.scheduledDate && seminar.scheduledDate >= returnDate) return false;
 
         return (
           seminar.supervisor1Id === id ||
@@ -141,14 +136,26 @@ export const update = mutation({
       });
 
       for (const seminar of overlappingSeminars) {
-        await ctx.db.patch(seminar._id, {
-          status: 'allocated',
-          scheduledDate: undefined,
-          scheduledStartTime: undefined,
-          scheduledEndTime: undefined,
-          scheduledRoom: undefined,
-          revisionCount: (seminar.revisionCount || 0) + 1,
-        });
+        let newStatus = 'allocated';
+        // Jika yang bermasalah adalah penguji, status harus kembali ke requested agar Kaprodi bisa mengalokasi ulang
+        if (seminar.examiner1Id === id || seminar.examiner2Id === id) {
+          newStatus = 'requested';
+        }
+
+        const patchData: Record<string, any> = {
+          status: newStatus,
+        };
+
+        // Jika sebelumnya sudah ada jadwal, reset jadwalnya
+        if (seminar.scheduledDate) {
+          patchData.scheduledDate = undefined;
+          patchData.scheduledStartTime = undefined;
+          patchData.scheduledEndTime = undefined;
+          patchData.scheduledRoom = undefined;
+          patchData.revisionCount = (seminar.revisionCount || 0) + 1;
+        }
+
+        await ctx.db.patch(seminar._id, patchData);
       }
     }
     // ---- END AUTO CANCEL SCHEDULING ----

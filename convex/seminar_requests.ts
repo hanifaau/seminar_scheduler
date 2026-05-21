@@ -261,6 +261,20 @@ export const update = mutation({
     if (updateData.examiner1Id === null) updateData.examiner1Id = undefined;
     if (updateData.examiner2Id === null) updateData.examiner2Id = undefined;
 
+    // Evaluasi status akhir jika ada penguji yang hilang
+    const finalExaminer1Id = 'examiner1Id' in updateData ? updateData.examiner1Id : existing.examiner1Id;
+    const finalExaminer2Id = 'examiner2Id' in updateData ? updateData.examiner2Id : existing.examiner2Id;
+
+    // Jika kehilangan penguji 1 atau penguji 2, status harus turun ke requested (Menunggu Alokasi)
+    if (!finalExaminer1Id || !finalExaminer2Id) {
+      updateData.status = 'requested';
+      // Pastikan jadwal dibatalkan jika statusnya turun
+      updateData.scheduledDate = undefined;
+      updateData.scheduledStartTime = undefined;
+      updateData.scheduledEndTime = undefined;
+      updateData.scheduledRoom = undefined;
+    }
+
     await ctx.db.patch(id, updateData);
     return id;
   },
