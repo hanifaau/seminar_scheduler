@@ -571,11 +571,35 @@ export default function PermohonanSeminarPage() {
                   <div className="bg-muted/50 rounded-lg p-3 space-y-3">
                     <div>
                       <span className="text-xs text-muted-foreground block mb-1">Penguji 1</span>
-                      <span className="text-sm font-medium">{lecturers?.find(l => l._id === formData.examiner1Id)?.name || 'Belum dialokasikan'}</span>
+                      <span className="text-sm font-medium">
+                        {(() => {
+                          const l = lecturers?.find(l => l._id === formData.examiner1Id);
+                          if (!l) return 'Belum dialokasikan';
+                          return (
+                            <span>
+                              {l.name}
+                              {l.status === 'on leave' && <span className="text-yellow-600"> (Cuti)</span>}
+                              {l.status === 'inactive' && <span className="text-red-600"> (Tidak Aktif)</span>}
+                            </span>
+                          );
+                        })()}
+                      </span>
                     </div>
                     <div>
                       <span className="text-xs text-muted-foreground block mb-1">Penguji 2</span>
-                      <span className="text-sm font-medium">{lecturers?.find(l => l._id === formData.examiner2Id)?.name || 'Belum dialokasikan'}</span>
+                      <span className="text-sm font-medium">
+                        {(() => {
+                          const l = lecturers?.find(l => l._id === formData.examiner2Id);
+                          if (!l) return 'Belum dialokasikan';
+                          return (
+                            <span>
+                              {l.name}
+                              {l.status === 'on leave' && <span className="text-yellow-600"> (Cuti)</span>}
+                              {l.status === 'inactive' && <span className="text-red-600"> (Tidak Aktif)</span>}
+                            </span>
+                          );
+                        })()}
+                      </span>
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1.5">
