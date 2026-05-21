@@ -88,13 +88,12 @@ export default function PermohonanSeminarPage() {
   const handleSendReminder = async (request: any) => {
     const toastId = toast.loading('Mengirim notifikasi...');
     try {
-      const isRevision = request.revisionCount && request.revisionCount >= 1;
       const result = await sendReminder({
         seminarRequestId: request._id,
-        messageType: isRevision ? 'revisi' : 'reminder'
+        messageType: 'reminder'
       });
       if (result.success) {
-        toast.success(`Notifikasi ${isRevision ? 'Revisi' : 'Reminder'} berhasil dikirim ke dosen`, { id: toastId });
+        toast.success(`Notifikasi Reminder berhasil dikirim ke dosen`, { id: toastId });
       } else {
         const errors = result.results?.filter((r: any) => !r.success).map((r: any) => r.message).join(', ');
         toast.warning(`Beberapa notifikasi gagal: ${errors || 'Cek log'}`, { id: toastId });
