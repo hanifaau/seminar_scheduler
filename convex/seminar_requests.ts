@@ -128,6 +128,52 @@ export const getByStatusWithLecturers = query({
   },
 });
 
+// Get seminar requests for Kaprodi Allocation (all active seminars except completed)
+export const getForAllocation = query({
+  args: {},
+  handler: async (ctx) => {
+    const requests = await ctx.db
+      .query('seminar_requests')
+      .filter((q) => q.neq(q.field('status'), 'completed'))
+      .order('desc')
+      .collect();
+
+    const requestsWithLecturers = await Promise.all(
+      requests.map(async (request) => {
+        let supervisor1 = null;
+        try {
+          if (request.supervisor1Id) supervisor1 = await ctx.db.get(request.supervisor1Id);
+        } catch(e) { console.error('Invalid supervisor1Id', request.supervisor1Id); }
+
+        let supervisor2 = null;
+        try {
+          if (request.supervisor2Id) supervisor2 = await ctx.db.get(request.supervisor2Id);
+        } catch(e) { console.error('Invalid supervisor2Id', request.supervisor2Id); }
+
+        let examiner1 = null;
+        try {
+          if (request.examiner1Id) examiner1 = await ctx.db.get(request.examiner1Id);
+        } catch(e) { console.error('Invalid examiner1Id', request.examiner1Id); }
+
+        let examiner2 = null;
+        try {
+          if (request.examiner2Id) examiner2 = await ctx.db.get(request.examiner2Id);
+        } catch(e) { console.error('Invalid examiner2Id', request.examiner2Id); }
+
+        return {
+          ...request,
+          supervisor1,
+          supervisor2,
+          examiner1,
+          examiner2,
+        };
+      })
+    );
+
+    return requestsWithLecturers;
+  },
+});
+
 // Create a new seminar request
 export const create = mutation({
   args: {

@@ -71,6 +71,14 @@ interface SeminarRequest {
   status: string;
 }
 
+const STATUS_LABELS: Record<string, { label: string; variant: 'secondary' | 'warning' | 'success' | 'outline' | 'default' }> = {
+  requested: { label: 'Menunggu Alokasi', variant: 'warning' },
+  allocated: { label: 'Siap Dijadwalkan', variant: 'secondary' },
+  waiting_confirmation: { label: 'Menunggu Konfirmasi', variant: 'outline' },
+  scheduled: { label: 'Terjadwal', variant: 'success' },
+  completed: { label: 'Selesai', variant: 'default' },
+};
+
 export default function AlokasiPengujiPage() {
   const [selectedRequest, setSelectedRequest] = React.useState<SeminarRequest | null>(null);
   const [examiner1Id, setExaminer1Id] = React.useState<string>('');
@@ -80,7 +88,7 @@ export default function AlokasiPengujiPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   // Queries
-  const requests = useQuery(api.seminar_requests.getByStatusWithLecturers, { status: 'requested' });
+  const requests = useQuery(api.seminar_requests.getForAllocation);
   const lecturers = useQuery(api.lecturers.getAll);
   const expertiseCategories = useQuery(api.expertise_categories.getAll);
 
@@ -149,8 +157,8 @@ export default function AlokasiPengujiPage() {
 
   const handleSelectRequest = (request: SeminarRequest) => {
     setSelectedRequest(request);
-    setExaminer1Id('');
-    setExaminer2Id('');
+    setExaminer1Id(request.examiner1Id || '');
+    setExaminer2Id(request.examiner2Id || '');
     setExpertiseFilter('semua');
     setSearchQuery('');
   };
@@ -180,7 +188,7 @@ export default function AlokasiPengujiPage() {
         examiner2Id: examiner2Id as any,
       });
 
-      toast.success('Penguji berhasil dialokasi');
+      toast.success('Penguji berhasil dialokasi/direvisi');
       setSelectedRequest(null);
       setExaminer1Id('');
       setExaminer2Id('');
@@ -232,7 +240,7 @@ export default function AlokasiPengujiPage() {
         <div className="space-y-4">
           <h2 className="font-semibold text-foreground flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Permohonan Menunggu Alokasi ({requests?.length || 0})
+            Permohonan Aktif ({requests?.length || 0})
           </h2>
 
           {isLoading ? (
@@ -243,7 +251,9 @@ export default function AlokasiPengujiPage() {
             </div>
           ) : requests && requests.length > 0 ? (
             <div className="space-y-4">
-              {requests.map((request) => (
+              {requests.map((request) => {
+                const statusInfo = STATUS_LABELS[request.status] || { label: request.status, variant: 'default' };
+                return (
                 <div
                   key={request._id}
                   className={cn(
@@ -259,9 +269,14 @@ export default function AlokasiPengujiPage() {
                       <p className="font-semibold text-foreground">{request.studentName}</p>
                       <p className="text-sm text-muted-foreground">{request.nim}</p>
                     </div>
-                    <Badge variant="outline">
-                      {SEMINAR_TYPES[request.type]}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant="outline">
+                        {SEMINAR_TYPES[request.type]}
+                      </Badge>
+                      <Badge variant={statusInfo.variant}>
+                        {statusInfo.label}
+                      </Badge>
+                    </div>
                   </div>
                   <p className="text-sm text-foreground line-clamp-2 mb-2">{request.title}</p>
                   <div className="space-y-1 text-xs text-muted-foreground">
@@ -290,7 +305,8 @@ export default function AlokasiPengujiPage() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-lg border p-8 text-center bg-card">
