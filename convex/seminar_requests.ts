@@ -519,6 +519,30 @@ export const requestRevision = mutation({
   },
 });
 
+// Request an examiner revision (back to Kaprodi)
+export const requestExaminerRevision = mutation({
+  args: { id: v.id('seminar_requests') },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.id);
+    if (!existing) {
+      throw new Error('Permohonan seminar tidak ditemukan');
+    }
+
+    await ctx.db.patch(args.id, {
+      status: 'requested',
+      scheduledDate: undefined,
+      scheduledTime: undefined,
+      scheduledStartTime: undefined,
+      scheduledEndTime: undefined,
+      scheduledRoom: undefined,
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
+  },
+});
+
+
 // Remove a seminar request
 export const remove = mutation({
   args: { id: v.id('seminar_requests') },

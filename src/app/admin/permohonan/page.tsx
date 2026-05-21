@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { Plus, Edit, Trash2, Loader2, FileText, Users, Bell, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -28,24 +29,23 @@ function Skeleton({ className }: { className?: string }) {
 
 function TableRowSkeleton() {
   return (
-    <tr className="border-b">
-      <td className="px-4 py-3"><Skeleton className="h-4 w-32" /></td>
-      <td className="px-4 py-3"><Skeleton className="h-4 w-24" /></td>
-      <td className="px-4 py-3"><Skeleton className="h-4 w-48" /></td>
-      <td className="px-4 py-3"><Skeleton className="h-6 w-20" /></td>
-      <td className="px-4 py-3"><Skeleton className="h-4 w-28" /></td>
-      <td className="px-4 py-3"><Skeleton className="h-8 w-24" /></td>
-      <td className="px-4 py-3"><Skeleton className="h-6 w-28" /></td>
-      <td className="px-4 py-3"><Skeleton className="h-8 w-20" /></td>
+    <tr className="border-b animate-pulse">
+      <td className="p-4"><Skeleton className="h-5 w-32" /></td>
+      <td className="p-4"><Skeleton className="h-5 w-24" /></td>
+      <td className="p-4"><Skeleton className="h-5 w-48" /></td>
+      <td className="p-4"><Skeleton className="h-5 w-24" /></td>
+      <td className="p-4"><Skeleton className="h-5 w-32" /></td>
+      <td className="p-4"><Skeleton className="h-5 w-24" /></td>
+      <td className="p-4"><Skeleton className="h-8 w-8 rounded-md" /></td>
     </tr>
   );
 }
 
-const SEMINAR_TYPES = [
-  { value: 'Proposal', label: 'Seminar Proposal' },
-  { value: 'Hasil', label: 'Seminar Hasil' },
-  { value: 'Sidang', label: 'Sidang Skripsi' },
-];
+const SEMINAR_TYPES: Record<string, string> = {
+  Proposal: 'Seminar Proposal',
+  Hasil: 'Seminar Hasil',
+  Sidang: 'Sidang Skripsi',
+};
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'secondary' | 'warning' | 'success' | 'outline' | 'default' }> = {
   requested: { label: 'Menunggu Alokasi', variant: 'warning' },
@@ -56,6 +56,7 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'secondary' | 'war
 };
 
 export default function PermohonanSeminarPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<string>('semua');
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
@@ -84,6 +85,7 @@ export default function PermohonanSeminarPage() {
   const updateRequest = useMutation(api.seminar_requests.update);
   const deleteRequest = useMutation(api.seminar_requests.remove);
   const requestRevision = useMutation(api.seminar_requests.requestRevision);
+  const requestExaminerRevision = useMutation(api.seminar_requests.requestExaminerRevision);
   const sendReminder = useAction(api.notifications.sendSeminarNotifications);
 
   const handleSendReminder = async (request: any) => {
@@ -129,6 +131,21 @@ export default function PermohonanSeminarPage() {
       return matchesSearch && matchesStatus;
     });
   }, [requests, searchQuery, statusFilter]);
+
+  const handleExaminerRevision = async (requestId: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin merevisi penguji? Status permohonan akan dikembalikan ke "Menunggu Alokasi" dan jadwal (jika ada) akan dibatalkan.')) {
+      return;
+    }
+    
+    const toastId = toast.loading('Memproses revisi...');
+    try {
+      await requestExaminerRevision({ id: requestId as any });
+      toast.success('Permohonan siap untuk direvisi pengujinya', { id: toastId });
+      router.push(`/kaprodi/alokasi?id=${requestId}`);
+    } catch (error: any) {
+      toast.error(error.message || 'Gagal merevisi penguji', { id: toastId });
+    }
+  };
 
   const handleSubmit = async () => {
     if (!formData.studentName || !formData.nim || !formData.title || !formData.supervisor1Id) {
@@ -561,12 +578,16 @@ export default function PermohonanSeminarPage() {
                       <Users className="h-5 w-5 text-primary" />
                       <h3 className="font-semibold text-foreground">Seksi Penguji Sidang</h3>
                     </div>
-                    <Link href={`/kaprodi/alokasi?id=${editingRequest._id}`}>
-                      <Button type="button" size="sm" variant="outline" className="flex items-center gap-1">
-                        <Edit className="h-4 w-4" />
-                        Revisi Penguji
-                      </Button>
-                    </Link>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex items-center gap-1"
+                      onClick={() => handleExaminerRevision(editingRequest._id)}
+                    >
+                      <Edit className="h-4 w-4" />
+                      Revisi Penguji
+                    </Button>
                   </div>
                   <div className="bg-muted/50 rounded-lg p-3 space-y-3">
                     <div>
