@@ -107,6 +107,45 @@ export const update = mutation({
     });
 
     await ctx.db.patch(id, updateData);
+
+    // ---- START AUTO CANCEL SCHEDULING ----
+    if (updates.status === 'on leave') {
+      const today = new Date().toISOString().split('T')[0];
+      const returnDate = updateData.activeReturnDate as string | undefined;
+
+      // Find all scheduled seminars involving this lecturer
+      const scheduledSeminars = await ctx.db
+        .query('seminar_requests')
+        .withIndex('by_status', (q) => q.eq('status', 'scheduled'))
+        .collect();
+
+      const overlappingSeminars = scheduledSeminars.filter(seminar => {
+        if (!seminar.scheduledDate || seminar.scheduledDate < today) return false;
+        
+        // If return date is specified, only cancel if scheduledDate < returnDate
+        if (returnDate && seminar.scheduledDate >= returnDate) return false;
+
+        return (
+          seminar.supervisor1Id === id ||
+          seminar.supervisor2Id === id ||
+          seminar.examiner1Id === id ||
+          seminar.examiner2Id === id
+        );
+      });
+
+      for (const seminar of overlappingSeminars) {
+        await ctx.db.patch(seminar._id, {
+          status: 'waiting_confirmation',
+          scheduledDate: undefined,
+          scheduledStartTime: undefined,
+          scheduledEndTime: undefined,
+          scheduledRoom: undefined,
+          revisionCount: (seminar.revisionCount || 0) + 1,
+        });
+      }
+    }
+    // ---- END AUTO CANCEL SCHEDULING ----
+
     return id;
   },
 });
