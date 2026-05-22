@@ -90,19 +90,12 @@ function AlokasiPengujiContent() {
   const [examiner2Id, setExaminer2Id] = React.useState<string>('');
   const [expertiseFilter, setExpertiseFilter] = React.useState<string>('semua');
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState<'requested' | 'semua'>(idFromUrl ? 'semua' : 'requested');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   // Queries
   const requests = useQuery(api.seminar_requests.getForAllocation);
   const lecturers = useQuery(api.lecturers.getAll);
   const expertiseCategories = useQuery(api.expertise_categories.getAll);
-
-  const displayedRequests = React.useMemo(() => {
-    if (!requests) return [];
-    if (statusFilter === 'semua') return requests;
-    return requests.filter(r => r.status === 'requested');
-  }, [requests, statusFilter]);
 
   // Auto-select request if ID is in URL
   React.useEffect(() => {
@@ -262,21 +255,10 @@ function AlokasiPengujiContent() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: Request List */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-foreground flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Permohonan ({displayedRequests?.length || 0})
-            </h2>
-            <Select value={statusFilter} onValueChange={(val: any) => setStatusFilter(val)}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
-                <SelectValue placeholder="Filter Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="requested">Belum Dialokasi</SelectItem>
-                <SelectItem value="semua">Semua Aktif</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <h2 className="font-semibold text-foreground flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Permohonan Aktif ({requests?.length || 0})
+          </h2>
 
           {isLoading ? (
             <div className="space-y-4">
@@ -284,9 +266,9 @@ function AlokasiPengujiContent() {
                 <CardSkeleton key={i} />
               ))}
             </div>
-          ) : displayedRequests && displayedRequests.length > 0 ? (
+          ) : requests && requests.length > 0 ? (
             <div className="space-y-4">
-              {displayedRequests.map((request) => {
+              {requests.map((request) => {
                 const statusInfo = STATUS_LABELS[request.status] || { label: request.status, variant: 'default' };
                 return (
                 <div

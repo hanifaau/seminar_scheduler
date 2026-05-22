@@ -128,13 +128,13 @@ export const getByStatusWithLecturers = query({
   },
 });
 
-// Get seminar requests for Kaprodi Allocation (all active seminars except completed)
+// Get seminar requests for Kaprodi Allocation
 export const getForAllocation = query({
   args: {},
   handler: async (ctx) => {
     const requests = await ctx.db
       .query('seminar_requests')
-      .filter((q) => q.neq(q.field('status'), 'completed'))
+      .withIndex('by_status', (q) => q.eq('status', 'requested'))
       .order('desc')
       .collect();
 
