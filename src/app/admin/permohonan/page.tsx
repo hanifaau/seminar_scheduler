@@ -428,7 +428,7 @@ export default function PermohonanSeminarPage() {
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant="outline">
-                          {SEMINAR_TYPES.find((t) => t.value === request.type)?.label}
+                          {SEMINAR_TYPES[request.type]}
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
