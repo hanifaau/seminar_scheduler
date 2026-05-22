@@ -542,9 +542,9 @@ export default function PermohonanSeminarPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {SEMINAR_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
+                    {Object.entries(SEMINAR_TYPES).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
                       </SelectItem>
                     ))}
                   </SelectContent>
