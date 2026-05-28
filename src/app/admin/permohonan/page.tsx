@@ -403,17 +403,17 @@ export default function PermohonanSeminarPage() {
       ) : (
         <div className="rounded-lg border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm table-fixed">
+            <table className="w-full text-xs">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-center font-medium text-foreground w-[12%]">Mahasiswa</th>
-                  <th className="px-4 py-3 text-center font-medium text-foreground w-[12%]">NIM</th>
-                  <th className="px-4 py-3 text-center font-medium text-foreground w-[15%]">Judul</th>
-                  <th className="px-4 py-3 text-center font-medium text-foreground w-[12%]">Jenis</th>
-                  <th className="px-4 py-3 text-center font-medium text-foreground w-[20%]">Pembimbing</th>
-                  <th className="px-4 py-3 text-center font-medium text-foreground w-[15%]">Jadwal & Ruangan</th>
-                  <th className="px-4 py-3 text-center font-medium text-foreground w-[10%]">Status</th>
-                  <th className="px-4 py-3 text-center font-medium text-foreground w-[4%]">Aksi</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground min-w-[100px]">Mahasiswa</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground min-w-[80px]">NIM</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground min-w-[150px] max-w-[250px]">Judul</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground min-w-[100px]">Jenis</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground min-w-[200px]">Pembimbing</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground min-w-[150px]">Jadwal & Ruangan</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground min-w-[100px]">Status</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground min-w-[80px]">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -421,31 +421,31 @@ export default function PermohonanSeminarPage() {
                   const statusInfo = STATUS_LABELS[request.status];
                   return (
                     <tr key={request._id} className="border-b hover:bg-muted/30 transition-colors text-center align-top">
-                      <td className="px-4 py-4 font-medium text-foreground">{request.studentName}</td>
-                      <td className="px-4 py-4 font-mono text-xs text-muted-foreground">{request.nim}</td>
-                      <td className="px-4 py-4">
-                        <div className="line-clamp-2 text-foreground mx-auto" title={request.title}>
+                      <td className="px-3 py-4 font-medium text-foreground">{request.studentName}</td>
+                      <td className="px-3 py-4 font-mono text-muted-foreground">{request.nim}</td>
+                      <td className="px-3 py-4 max-w-[250px]">
+                        <div className="line-clamp-3 text-foreground mx-auto text-left" title={request.title}>
                           {request.title}
                         </div>
                       </td>
-                      <td className="px-4 py-4">
-                        <Badge variant="outline">
+                      <td className="px-3 py-4">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
                           {SEMINAR_TYPES[request.type]}
                         </Badge>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-3 py-4">
                         <div className="flex flex-col gap-1 items-center">
-                          <span className="text-foreground text-sm font-medium">
+                          <span className="text-foreground font-medium">
                             {request.supervisor1?.status === 'inactive' && request.status !== 'completed' ? '-' : request.supervisor1?.name || '-'}
                           </span>
                           {request.supervisor2 && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-muted-foreground">
                               {request.supervisor2.status === 'inactive' && request.status !== 'completed' ? '-' : request.supervisor2.name}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-3 py-4">
                         {request.scheduledDate ? (
                           <div className="flex flex-col gap-1 text-xs items-center">
                             <span className="font-medium text-foreground">{request.scheduledDate}</span>
@@ -456,13 +456,13 @@ export default function PermohonanSeminarPage() {
                           <span className="text-xs text-muted-foreground italic">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-4">
-                        <Badge variant={statusInfo.variant}>
+                      <td className="px-3 py-4">
+                        <Badge variant={statusInfo.variant} className="text-[10px] px-1.5 py-0.5">
                           {statusInfo.label}
                         </Badge>
                       </td>
-                      <td className="px-4 py-4">
-                        <div className="flex justify-center gap-2 items-center">
+                      <td className="px-3 py-4">
+                        <div className="flex justify-center gap-1 items-center">
                           {request.status === 'scheduled' ? (
                             <Button
                               variant="ghost"
