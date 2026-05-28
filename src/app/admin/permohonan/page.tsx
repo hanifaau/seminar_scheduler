@@ -455,10 +455,10 @@ export default function PermohonanSeminarPage() {
                       </td>
                       <td className="px-3 py-4 text-left">
                         {request.scheduledDate ? (
-                          <div className="flex flex-col gap-1 text-xs items-start">
-                            <span className="font-medium text-foreground">{request.scheduledDate}</span>
-                            <span className="text-muted-foreground">{request.scheduledStartTime} - {request.scheduledEndTime}</span>
-                            <span className="text-muted-foreground">Ruang: {request.scheduledRoom || '-'}</span>
+                          <div className="flex flex-col gap-1 text-xs items-start max-w-[150px]">
+                            <span className="font-medium text-foreground break-words whitespace-normal">{request.scheduledDate}</span>
+                            <span className="text-muted-foreground break-words whitespace-normal">{request.scheduledStartTime} - {request.scheduledEndTime}</span>
+                            <span className="text-muted-foreground break-words whitespace-normal">Ruang: {request.scheduledRoom || '-'}</span>
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground italic">-</span>
