@@ -406,12 +406,12 @@ export default function PermohonanSeminarPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="px-3 py-3 text-left font-medium text-foreground w-[12%]">Mahasiswa</th>
-                  <th className="px-3 py-3 text-left font-medium text-foreground w-[10%]">NIM</th>
-                  <th className="px-3 py-3 text-left font-medium text-foreground w-[18%]">Judul</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground w-[12%]">Mahasiswa</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground w-[10%]">NIM</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground w-[18%]">Judul</th>
                   <th className="px-3 py-3 text-center font-medium text-foreground w-[10%]">Jenis</th>
-                  <th className="px-3 py-3 text-left font-medium text-foreground w-[22%]">Pembimbing</th>
-                  <th className="px-3 py-3 text-left font-medium text-foreground w-[13%]">Jadwal & Ruangan</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground w-[22%]">Pembimbing</th>
+                  <th className="px-3 py-3 text-center font-medium text-foreground w-[13%]">Jadwal & Ruangan</th>
                   <th className="px-3 py-3 text-center font-medium text-foreground w-[10%]">Status</th>
                   <th className="px-3 py-3 text-center font-medium text-foreground w-[5%]">Aksi</th>
                 </tr>
