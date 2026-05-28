@@ -481,7 +481,9 @@ export default function PermohonanSeminarPage() {
                               <Bell className="h-4 w-4 text-blue-500" />
                             </Button>
                           ) : (
-                            <span className="text-muted-foreground mx-2 font-bold">-</span>
+                            <div className="w-9 flex justify-center items-center">
+                              <span className="text-muted-foreground font-bold">-</span>
+                            </div>
                           )}
                           <Button
                             variant="ghost"
