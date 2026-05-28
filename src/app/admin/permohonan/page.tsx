@@ -421,10 +421,18 @@ export default function PermohonanSeminarPage() {
                   const statusInfo = STATUS_LABELS[request.status];
                   return (
                     <tr key={request._id} className="border-b hover:bg-muted/30 transition-colors align-top">
-                      <td className="px-3 py-4 text-left font-medium text-foreground">{request.studentName}</td>
-                      <td className="px-3 py-4 text-left font-mono text-muted-foreground">{request.nim}</td>
                       <td className="px-3 py-4 text-left">
-                        <div className="line-clamp-3 text-foreground break-words" title={request.title}>
+                        <div className="max-w-[120px] break-words whitespace-normal font-medium text-foreground">
+                          {request.studentName}
+                        </div>
+                      </td>
+                      <td className="px-3 py-4 text-left">
+                        <div className="max-w-[100px] break-words font-mono text-muted-foreground">
+                          {request.nim}
+                        </div>
+                      </td>
+                      <td className="px-3 py-4 text-left">
+                        <div className="max-w-[200px] line-clamp-3 text-foreground break-words whitespace-normal" title={request.title}>
                           {request.title}
                         </div>
                       </td>
@@ -434,12 +442,12 @@ export default function PermohonanSeminarPage() {
                         </Badge>
                       </td>
                       <td className="px-3 py-4 text-left">
-                        <div className="flex flex-col gap-1 items-start">
-                          <span className="text-foreground font-medium break-words">
+                        <div className="flex flex-col gap-1 items-start max-w-[180px]">
+                          <span className="text-foreground font-medium break-words whitespace-normal">
                             {request.supervisor1?.status === 'inactive' && request.status !== 'completed' ? '-' : request.supervisor1?.name || '-'}
                           </span>
                           {request.supervisor2 && (
-                            <span className="text-muted-foreground break-words">
+                            <span className="text-muted-foreground break-words whitespace-normal">
                               {request.supervisor2.status === 'inactive' && request.status !== 'completed' ? '-' : request.supervisor2.name}
                             </span>
                           )}
