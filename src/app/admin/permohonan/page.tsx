@@ -433,10 +433,12 @@ export default function PermohonanSeminarPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-0.5 items-center">
-                          <span className="text-foreground">{request.supervisor1?.name || '-'}</span>
+                          <span className="text-foreground">
+                            {request.supervisor1?.status === 'inactive' ? '-' : request.supervisor1?.name || '-'}
+                          </span>
                           {request.supervisor2 && (
                             <span className="text-xs text-muted-foreground">
-                              {request.supervisor2.name}
+                              {request.supervisor2.status === 'inactive' ? '-' : request.supervisor2.name}
                             </span>
                           )}
                         </div>
