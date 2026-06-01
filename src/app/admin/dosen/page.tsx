@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { Plus, Upload, Download, Loader2, Edit, Trash2, FileText, Settings } from 'lucide-react';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { api } from 'convex/_generated/api';
 import { Button } from '@/components/atoms/Button';
@@ -48,51 +48,60 @@ function TableRowSkeleton() {
   );
 }
 
-// CSV Parser untuk Dosen (Simplified: Index, Nama, NIP only)
-function parseDosenCSV(file: File): Promise<{ nama: string; nip: string; phone?: string }[]> {
+// Excel Parser untuk Dosen (Simplified: Index, Nama, NIP only)
+function parseDosenExcel(file: File): Promise<{ nama: string; nip: string; phone?: string }[]> {
   return new Promise((resolve, reject) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header) => {
-        const h = header.toLowerCase().trim();
-        if (h.includes('nama')) return 'nama';
-        // Hanya tangkap NIP, NIDN, NIK, atau kata "induk"
-        if (h === 'nip' || h === 'nidn' || h === 'nik' || h.includes('induk')) return 'nip';
-        if (h.includes('hp') || h.includes('telepon') || h.includes('phone')) return 'phone';
-        return h;
-      },
-      complete: (results) => {
-        const data = results.data as Record<string, string>[];
-        const dosens = data
-          .filter((row) => row.nama && row.nip)
-          .map((row) => ({
-            nama: row.nama.trim(),
-            nip: row.nip.trim(),
-            phone: row.phone?.trim(),
-          }));
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+
+        const dosens = json
+          .map((row) => {
+            const keys = Object.keys(row);
+            const namaKey = keys.find(k => k.toLowerCase().includes('nama'));
+            const nipKey = keys.find(k => {
+              const h = k.toLowerCase().trim();
+              return h === 'nip' || h === 'nidn' || h === 'nik' || h.includes('induk');
+            });
+            const phoneKey = keys.find(k => {
+              const h = k.toLowerCase().trim();
+              return h.includes('hp') || h.includes('telepon') || h.includes('phone');
+            });
+
+            return {
+              nama: namaKey ? String(row[namaKey]).trim() : '',
+              nip: nipKey ? String(row[nipKey]).trim() : '',
+              phone: phoneKey ? String(row[phoneKey]).trim() : undefined,
+            };
+          })
+          .filter(d => d.nama && d.nip);
+
         resolve(dosens);
-      },
-      error: (error) => {
-        reject(new Error(`Gagal membaca file CSV: ${error.message}`));
-      },
-    });
+      } catch (error) {
+        reject(new Error('Gagal membaca file Excel'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Gagal membaca file'));
+    reader.readAsArrayBuffer(file);
   });
 }
 
-// Generate sample CSV (Simplified)
-function generateSampleDosenCSV(): string {
-  const headers = ['Index', 'Nama', 'NIP', 'No HP'];
+// Generate sample Excel template
+function handleDownloadTemplate() {
   const sampleData = [
-    ['1', 'Dr. Ahmad Fauzi, M.T.', '198001011990011001', '081234567890'],
-    ['2', 'Prof. Siti Rahma, Ph.D.', '197505021998022002', '082345678901'],
-    ['3', 'Ir. Budi Santoso, M.Eng.', '198203032005031003', ''],
+    { 'Index': 1, 'Nama': 'Dr. Ahmad Fauzi, M.T.', 'NIP': '198001011990011001', 'No HP': '081234567890' },
+    { 'Index': 2, 'Nama': 'Prof. Siti Rahma, Ph.D.', 'NIP': '197505021998022002', 'No HP': '082345678901' },
+    { 'Index': 3, 'Nama': 'Ir. Budi Santoso, M.Eng.', 'NIP': '198203032005031003', 'No HP': '' },
   ];
-  const csvContent = [
-    headers.join(','),
-    ...sampleData.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-  ].join('\n');
-  return csvContent;
+  const worksheet = XLSX.utils.json_to_sheet(sampleData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Template Dosen");
+  XLSX.writeFile(workbook, "Template_Dosen.xlsx");
 }
 
 export default function ManajemenDosenPage() {
@@ -213,11 +222,11 @@ export default function ManajemenDosenPage() {
     if (!file) return;
 
     try {
-      const data = await parseDosenCSV(file);
+      const data = await parseDosenExcel(file);
       setCSVData(data);
       toast.success(`${data.length} data dosen ditemukan`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Gagal membaca file CSV');
+      toast.error(error instanceof Error ? error.message : 'Gagal membaca file Excel');
     }
   };
 
@@ -257,14 +266,6 @@ export default function ManajemenDosenPage() {
     }
   };
 
-  const handleDownloadTemplate = () => {
-    const csvContent = generateSampleDosenCSV();
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'template_dosen.csv';
-    link.click();
-  };
 
   const isLoading = lecturers === undefined;
 
@@ -281,7 +282,7 @@ export default function ManajemenDosenPage() {
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setIsUploadDialogOpen(true)}>
             <Upload className="h-4 w-4 mr-2" />
-            Unggah CSV
+            Unggah Excel
           </Button>
           <Link href="/admin/manage-expertise">
             <Button variant="outline">
@@ -622,7 +623,7 @@ export default function ManajemenDosenPage() {
       {isUploadDialogOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-lg p-6 w-full max-w-lg">
-            <h2 className="text-lg font-semibold mb-4 text-foreground">Unggah Data Dosen CSV</h2>
+            <h2 className="text-lg font-semibold mb-4 text-foreground">Unggah Data Dosen Excel</h2>
 
             {csvData.length === 0 ? (
               <>
@@ -637,14 +638,14 @@ export default function ManajemenDosenPage() {
                     </p>
                     <input
                       type="file"
-                      accept=".csv"
+                      accept=".xlsx, .xls"
                       onChange={handleFileUpload}
                       className="hidden"
-                      id="csv-upload"
+                      id="excel-upload"
                     />
-                    <label htmlFor="csv-upload">
+                    <label htmlFor="excel-upload">
                       <Button variant="outline" className="cursor-pointer" asChild>
-                        <span>Pilih File CSV</span>
+                        <span>Pilih File Excel</span>
                       </Button>
                     </label>
                   </div>
