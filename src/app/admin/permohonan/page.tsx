@@ -346,7 +346,14 @@ export default function PermohonanSeminarPage() {
     const excelData = scheduledRequests.map(r => {
       const supervisors = [getLecturerName(r.supervisor1Id), getLecturerName(r.supervisor2Id)].filter(Boolean).join(', ');
       const examiners = [getLecturerName(r.examiner1Id), getLecturerName(r.examiner2Id)].filter(Boolean).join(', ');
-      const scheduleAndRoom = `${r.scheduledDate || ''} ${r.scheduledStartTime || r.scheduledTime || ''} - ${r.scheduledEndTime || ''} | Ruang: ${r.scheduledRoom || ''}`;
+      
+      let hari = '';
+      if (r.scheduledDate) {
+        const dateObj = new Date(r.scheduledDate);
+        hari = dateObj.toLocaleDateString('id-ID', { weekday: 'long' });
+      }
+
+      const waktu = (r.scheduledStartTime || r.scheduledTime) ? `${r.scheduledStartTime || r.scheduledTime} - ${r.scheduledEndTime || 'Selesai'}` : '';
 
       return {
         'Nama': r.studentName,
@@ -354,7 +361,10 @@ export default function PermohonanSeminarPage() {
         'Judul': r.title,
         'Dosen Pembimbing': supervisors,
         'Dosen Penguji': examiners,
-        'Jadwal dan Ruangan': scheduleAndRoom.trim(),
+        'Hari': hari,
+        'Tanggal': r.scheduledDate || '',
+        'Waktu': waktu,
+        'Ruangan': r.scheduledRoom || '',
         'Jenis': SEMINAR_TYPES[r.type] || r.type,
       };
     });
