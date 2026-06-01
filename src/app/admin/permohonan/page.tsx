@@ -344,9 +344,6 @@ export default function PermohonanSeminarPage() {
 
     // Format data for Excel
     const excelData = scheduledRequests.map(r => {
-      const supervisors = [getLecturerName(r.supervisor1Id), getLecturerName(r.supervisor2Id)].filter(Boolean).join(', ');
-      const examiners = [getLecturerName(r.examiner1Id), getLecturerName(r.examiner2Id)].filter(Boolean).join(', ');
-      
       let hari = '';
       if (r.scheduledDate) {
         const dateObj = new Date(r.scheduledDate);
@@ -359,8 +356,10 @@ export default function PermohonanSeminarPage() {
         'Nama': r.studentName,
         'NIM': r.nim,
         'Judul': r.title,
-        'Dosen Pembimbing': supervisors,
-        'Dosen Penguji': examiners,
+        'Dosen Pembimbing 1': getLecturerName(r.supervisor1Id),
+        'Dosen Pembimbing 2': getLecturerName(r.supervisor2Id),
+        'Dosen Penguji 1': getLecturerName(r.examiner1Id),
+        'Dosen Penguji 2': getLecturerName(r.examiner2Id),
         'Hari': hari,
         'Tanggal': r.scheduledDate || '',
         'Waktu': waktu,
