@@ -132,7 +132,10 @@ async function getScheduledSeminarsForDate(
     .query('seminar_requests')
     .filter((q: any) =>
       q.and(
-        q.eq(q.field('status'), 'scheduled'),
+        q.or(
+          q.eq(q.field('status'), 'scheduled'),
+          q.eq(q.field('status'), 'waiting_confirmation')
+        ),
         q.eq(q.field('scheduledDate'), date)
       )
     )
@@ -657,7 +660,10 @@ export const checkSlotAvailability = query({
       .query('seminar_requests')
       .filter((q) =>
         q.and(
-          q.eq(q.field('status'), 'scheduled'),
+          q.or(
+            q.eq(q.field('status'), 'scheduled'),
+            q.eq(q.field('status'), 'waiting_confirmation')
+          ),
           q.eq(q.field('scheduledDate'), args.date)
         )
       )
@@ -750,7 +756,10 @@ export const getAvailableRooms = query({
       .query('seminar_requests')
       .filter((q) =>
         q.and(
-          q.eq(q.field('status'), 'scheduled'),
+          q.or(
+            q.eq(q.field('status'), 'scheduled'),
+            q.eq(q.field('status'), 'waiting_confirmation')
+          ),
           q.eq(q.field('scheduledDate'), args.date)
         )
       )
