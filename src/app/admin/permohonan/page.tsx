@@ -4,8 +4,9 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useAction } from 'convex/react';
-import { Plus, Edit, Trash2, Loader2, FileText, Users, Bell, Info } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, FileText, Users, Bell, Info, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import { api } from 'convex/_generated/api';
 import { Button } from '@/components/atoms/Button';
 import { Input } from '@/components/atoms/Input';
@@ -324,6 +325,46 @@ export default function PermohonanSeminarPage() {
       .map(formatLecturerOption)
   ];
 
+  const handleDownloadExcel = () => {
+    if (!requests) return;
+    
+    // Filter scheduled requests
+    const scheduledRequests = requests.filter(r => r.status === 'scheduled');
+    
+    if (scheduledRequests.length === 0) {
+      toast.error('Tidak ada agenda yang sudah terjadwal');
+      return;
+    }
+
+    const getLecturerName = (id?: string) => {
+      if (!id || !lecturers) return '';
+      const lecturer = lecturers.find(l => l._id === id);
+      return lecturer ? lecturer.name : '';
+    };
+
+    // Format data for Excel
+    const excelData = scheduledRequests.map(r => {
+      const supervisors = [getLecturerName(r.supervisor1Id), getLecturerName(r.supervisor2Id)].filter(Boolean).join(', ');
+      const examiners = [getLecturerName(r.examiner1Id), getLecturerName(r.examiner2Id)].filter(Boolean).join(', ');
+      const scheduleAndRoom = `${r.scheduledDate || ''} ${r.scheduledStartTime || r.scheduledTime || ''} - ${r.scheduledEndTime || ''} | Ruang: ${r.scheduledRoom || ''}`;
+
+      return {
+        'Nama': r.studentName,
+        'NIM': r.nim,
+        'Judul': r.title,
+        'Dosen Pembimbing': supervisors,
+        'Dosen Penguji': examiners,
+        'Jadwal dan Ruangan': scheduleAndRoom.trim(),
+        'Jenis': SEMINAR_TYPES[r.type] || r.type,
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Agenda Terjadwal");
+    XLSX.writeFile(workbook, "Agenda_Terjadwal_Seminar.xlsx");
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -334,10 +375,16 @@ export default function PermohonanSeminarPage() {
             Kelola permohonan seminar mahasiswa
           </p>
         </div>
-        <Button onClick={openNewDialog}>
-          <Plus className="h-4 w-4 mr-2" />
-          Tambah Permohonan
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleDownloadExcel}>
+            <Download className="h-4 w-4 mr-2" />
+            Unduh Agenda Terjadwal
+          </Button>
+          <Button onClick={openNewDialog}>
+            <Plus className="h-4 w-4 mr-2" />
+            Tambah Permohonan
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
