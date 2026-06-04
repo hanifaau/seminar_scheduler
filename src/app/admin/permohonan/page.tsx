@@ -351,7 +351,13 @@ export default function PermohonanSeminarPage() {
       }
 
       const waktu = (r.scheduledStartTime || r.scheduledTime) ? `${r.scheduledStartTime || r.scheduledTime} - ${r.scheduledEndTime || 'Selesai'}` : '';
-      const statusLabel = r.status === 'completed' ? 'Selesai' : 'Terjadwal';
+      
+      let actualStatus = r.status;
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (r.status === 'scheduled' && r.scheduledDate && r.scheduledDate < todayStr) {
+        actualStatus = 'completed';
+      }
+      const statusLabel = actualStatus === 'completed' ? 'Selesai' : 'Terjadwal';
 
       return {
         'Nama': r.studentName,
