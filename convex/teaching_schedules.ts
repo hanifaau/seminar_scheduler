@@ -297,11 +297,27 @@ export const importSmartSchedule = mutation({
     // Prevent duplicates within the same import execution
     const scheduleKeys = new Set<string>();
 
-    const parseLecturerKeywords = (names: string) =>
-      names
-        .split(',')
-        .map((name) => name.trim())
-        .filter(Boolean);
+    const parseLecturerKeywords = (names: string) => {
+      // Pisahkan berdasarkan koma ATAU garis miring (untuk jadwal UTS)
+      const parts = names.split(/[,/]/);
+      return parts
+        .map((p) => p.trim())
+        .filter((p) => {
+          if (!p) return false;
+          // Abaikan jika bagian ini murni hanya berisi gelar
+          const lower = p.toLowerCase().replace(/\./g, '').trim();
+          const titles = ['prof', 'dr', 'ir', 'st', 'mt', 'msc', 'meng', 'phd', 'eng', 'skom', 'ipu', 'aseaneng', 'msie', 'msi', 'mm'];
+          
+          // Cek apakah semua kata dalam string ini adalah gelar (misal: "prof dr eng")
+          const words = lower.split(' ').filter(Boolean);
+          if (words.length > 0 && words.every(w => titles.includes(w))) {
+            return false;
+          }
+          
+          if (p.length < 3) return false;
+          return true;
+        });
+    };
 
     for (const scheduleData of args.schedules) {
       const { day, date, startTime, endTime, activity, room, lecturerNames } = scheduleData;
