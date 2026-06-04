@@ -66,7 +66,11 @@ function minutesToTime(minutes: number): string {
 }
 
 // Parse day name to Indonesian format
-function parseDayName(dayName: string): string {
+function parseDayName(dateString: string): string {
+  // Extract and title-case the day name to match our standard format
+  let dayName = dateString.split(',')[0].trim();
+  dayName = dayName.charAt(0).toUpperCase() + dayName.slice(1).toLowerCase();
+
   const dayMap: Record<string, string> = {
     Monday: 'Senin',
     Tuesday: 'Selasa',
