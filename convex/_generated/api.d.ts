@@ -17,6 +17,7 @@ import type * as scheduling from "../scheduling.js";
 import type * as seminar_requests from "../seminar_requests.js";
 import type * as staff from "../staff.js";
 import type * as teaching_schedules from "../teaching_schedules.js";
+import type * as test from "../test.js";
 
 import type {
   ApiFromModules,
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   seminar_requests: typeof seminar_requests;
   staff: typeof staff;
   teaching_schedules: typeof teaching_schedules;
+  test: typeof test;
 }>;
 
 /**

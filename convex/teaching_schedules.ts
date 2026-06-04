@@ -306,7 +306,7 @@ export const importSmartSchedule = mutation({
           if (!p) return false;
           // Abaikan jika bagian ini murni hanya berisi gelar
           const lower = p.toLowerCase().replace(/\./g, '').trim();
-          const titles = ['prof', 'dr', 'ir', 'st', 'mt', 'msc', 'meng', 'phd', 'eng', 'skom', 'ipu', 'aseaneng', 'msie', 'msi', 'mm'];
+          const titles = ['prof', 'dr', 'ir', 'st', 'mt', 'msc', 'meng', 'phd', 'eng', 'skom', 'ipu', 'aseaneng', 'msie', 'msi', 'mm', 'dreng', 'mengsc', 'stmt'];
           
           // Cek apakah semua kata dalam string ini adalah gelar (misal: "prof dr eng")
           const words = lower.split(' ').filter(Boolean);
@@ -329,9 +329,11 @@ export const importSmartSchedule = mutation({
       const matchedLecturerIds = new Set<string>();
 
       for (const keyword of keywords) {
-        const matches = allLecturers.filter((lecturer) =>
-          lecturer.name.toLowerCase().includes(keyword.toLowerCase())
-        );
+        const matches = allLecturers.filter((lecturer) => {
+          const dbName = lecturer.name.toLowerCase();
+          const keywordWords = keyword.toLowerCase().split(' ').filter(Boolean);
+          return keywordWords.every(w => dbName.includes(w));
+        });
 
         if (matches.length === 0) {
           if (!lecturersNotFound.includes(keyword)) {
@@ -352,7 +354,7 @@ export const importSmartSchedule = mutation({
       for (const lecturerIdStr of Array.from(matchedLecturerIds)) {
         const lecturerId = lecturerIdStr as any;
 
-        const scheduleKey = `${lecturerId}-${date || day}-${startTime}-${endTime}`;
+        const scheduleKey = `${lecturerId}-${date || day}-${startTime}-${endTime}-${room || 'noroom'}`;
         if (scheduleKeys.has(scheduleKey)) {
           duplicatesSkipped++;
           continue;

@@ -85,11 +85,30 @@ export default function ScheduleGroupsPage() {
             let currentDay = '';
             let currentStartTime = '';
             let currentEndTime = '';
+            let currentMatkul = '';
+            let colIdx = { matkul: 3, dosen: 5, ruang: 8 };
 
             const monthMap: Record<string, string> = {
               'januari': '01', 'februari': '02', 'maret': '03', 'april': '04', 'mei': '05', 'juni': '06',
               'juli': '07', 'agustus': '08', 'september': '09', 'oktober': '10', 'november': '11', 'desember': '12'
             };
+
+            // Cari indeks kolom dari header
+            for (let i = 0; i < Math.min(20, rows.length); i++) {
+              const row = rows[i].map(c => String(c).toLowerCase().trim());
+              const matkulIdx = row.findIndex(c => c.includes('mata kuliah') || c.includes('matkul') || c.includes('course'));
+              const dosenIdx = row.findIndex(c => c.includes('dosen') || c.includes('pengampu'));
+              const ruangIdx = row.findIndex(c => c.includes('ruang'));
+              
+              if (matkulIdx > -1 && dosenIdx > -1) {
+                colIdx = {
+                  matkul: matkulIdx,
+                  dosen: dosenIdx,
+                  ruang: ruangIdx > -1 ? ruangIdx : 8
+                };
+                break;
+              }
+            }
 
             for (let i = 0; i < rows.length; i++) {
               const row = rows[i];
@@ -111,13 +130,19 @@ export default function ScheduleGroupsPage() {
                 continue; 
               }
 
-              // Baris Data
-              const matkul = String(row[3] || '').trim(); // Kolom D: Matakuliah
-              const dosen = String(row[5] || '').trim();  // Kolom F: Dosen Pengampu
-              const ruang = String(row[8] || '').trim();  // Kolom I: Ruang
+              // Baris Data menggunakan indeks kolom dinamis
+              const matkulRaw = String(row[colIdx.matkul] || '').trim();
+              const dosen = String(row[colIdx.dosen] || '').trim();
+              const ruang = String(row[colIdx.ruang] || '').trim();
+
+              // Jika matkulRaw ada isinya dan bukan header, simpan sebagai currentMatkul (untuk mengatasi merged cells)
+              if (matkulRaw && !matkulRaw.toLowerCase().includes('mata kuliah') && matkulRaw.toLowerCase() !== 'matakuliah') {
+                currentMatkul = matkulRaw;
+              }
+              const matkul = currentMatkul;
 
               // Jika ini baris data yang valid (bukan header tabel)
-              if (currentDate && matkul && dosen && matkul.toLowerCase() !== 'matakuliah') {
+              if (currentDate && matkul && dosen && !dosen.toLowerCase().includes('dosen pengampu')) {
                 parsedSchedules.push({
                   day: currentDay,
                   date: currentDate,
@@ -348,7 +373,10 @@ export default function ScheduleGroupsPage() {
 
                     return activeSchedules.map((schedule) => (
                       <tr key={schedule._id} className="hover:bg-muted/30">
-                        <td className="px-4 py-3 font-medium">{schedule.day}</td>
+                        <td className="px-4 py-3 font-medium">
+                          {schedule.day}
+                          {schedule.date && <span className="block text-xs font-normal text-muted-foreground">{schedule.date}</span>}
+                        </td>
                         <td className="px-4 py-3">
                           {schedule.startTime} - {schedule.endTime}
                         </td>
