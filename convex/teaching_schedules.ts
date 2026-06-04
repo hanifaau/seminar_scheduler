@@ -306,7 +306,10 @@ export const importSmartSchedule = mutation({
           if (!p) return false;
           // Abaikan jika bagian ini murni hanya berisi gelar
           const lower = p.toLowerCase().replace(/\./g, '').trim();
-          const titles = ['prof', 'dr', 'ir', 'st', 'mt', 'msc', 'meng', 'phd', 'eng', 'skom', 'ipu', 'ipm', 'ipp', 'aseaneng', 'msie', 'msi', 'mm', 'dreng', 'mengsc', 'stmt', 'm', 's', 't', 'd'];
+          const titles = [
+            'prof', 'dr', 'ir', 'st', 'mt', 'msc', 'meng', 'phd', 'eng', 'skom', 'ipu', 'ipm', 'ipp', 'aseaneng', 'msie', 'msi', 'mm', 'dreng', 'mengsc', 'stmt', 'm', 's', 't', 'd',
+            'spd', 'mpd', 'pd', 'ss', 'ma', 'mhum', 'bba', 'mba'
+          ];
           
           const words = lower.split(' ').filter(Boolean);
           if (words.length === 0) return false;
