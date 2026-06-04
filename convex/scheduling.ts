@@ -91,10 +91,12 @@ function parseDayName(dateString: string): string {
 }
 
 // Get lecturer busy slots for a specific day (including transition gap and details)
-async function getLecturerBusySlotsForDay(
+async function getLecturerBusySlotsForDate(
   ctx: any,
   lecturerId: string,
-  day: string
+  day: string,
+  date: string
+
 ): Promise<LecturerBusySlot[]> {
   const schedules = await ctx.db
     .query('teaching_schedules')
@@ -112,9 +114,14 @@ async function getLecturerBusySlotsForDay(
   const lecturerName = lecturer?.name || 'Dosen';
 
   const daySchedules = schedules.filter((s: any) => {
-    const isSameDay = parseDayName(s.day) === parseDayName(day);
+    // 1. Is it a weekly routine schedule for this day? (date is undefined, day matches)
+    const isRoutineMatch = !s.date && parseDayName(s.day) === parseDayName(day);
+    // 2. Is it a specific date schedule? (date matches exactly)
+    const isSpecificDateMatch = s.date === date;
+    
+    const isDayMatch = isRoutineMatch || isSpecificDateMatch;
     const isActive = s.groupId ? activeGroupIds.has(s.groupId.toString()) : true; // keep legacy schedules active
-    return isSameDay && isActive;
+    return isDayMatch && isActive;
   });
 
   return daySchedules.map((s: any) => ({
@@ -352,7 +359,7 @@ export const getAvailableSlots = query({
       const allLecturerBusySlots: LecturerBusySlot[][] = [];
 
       for (const lecturerId of lecturerIds) {
-        const busySlots = await getLecturerBusySlotsForDay(ctx, lecturerId, dateInfo.day);
+        const busySlots = await getLecturerBusySlotsForDate(ctx, lecturerId, dateInfo.day, dateInfo.date);
         allLecturerBusySlots.push(busySlots);
       }
 

@@ -81,6 +81,7 @@ export default defineSchema({
     groupId: v.optional(v.id('schedule_groups')), // Reference to schedule group
     courseId: v.optional(v.any()), // Legacy field: retained as optional to prevent validation errors on old data
     day: v.string(), // e.g., "Senin", "Selasa", etc.
+    date: v.optional(v.string()), // Specific date for one-off schedules like UTS/UAS, e.g., "2026-04-06"
     shiftId: v.optional(v.string()), // e.g., "2sks-1", "3sks-2"
     startTime: v.string(), // e.g., "07:30"
     endTime: v.string(), // e.g., "09:10"

@@ -275,6 +275,7 @@ export const importSmartSchedule = mutation({
     schedules: v.array(
       v.object({
         day: v.string(),
+        date: v.optional(v.string()),
         startTime: v.string(),
         endTime: v.string(),
         activity: v.string(),
@@ -303,7 +304,7 @@ export const importSmartSchedule = mutation({
         .filter(Boolean);
 
     for (const scheduleData of args.schedules) {
-      const { day, startTime, endTime, activity, room, lecturerNames } = scheduleData;
+      const { day, date, startTime, endTime, activity, room, lecturerNames } = scheduleData;
       const lecturerNamesTrimmed = lecturerNames.trim();
 
       if (!lecturerNamesTrimmed) continue;
@@ -335,7 +336,7 @@ export const importSmartSchedule = mutation({
       for (const lecturerIdStr of Array.from(matchedLecturerIds)) {
         const lecturerId = lecturerIdStr as any;
 
-        const scheduleKey = `${lecturerId}-${day}-${startTime}-${endTime}`;
+        const scheduleKey = `${lecturerId}-${date || day}-${startTime}-${endTime}`;
         if (scheduleKeys.has(scheduleKey)) {
           duplicatesSkipped++;
           continue;
@@ -345,6 +346,7 @@ export const importSmartSchedule = mutation({
           lecturerId: lecturerId,
           groupId: args.groupId,
           day,
+          date: date || undefined,
           startTime,
           endTime,
           activity,

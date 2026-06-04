@@ -77,78 +77,130 @@ export default function ScheduleGroupsPage() {
 
           if (!rows || rows.length === 0) throw new Error('File kosong');
 
-          // Find Header Row
-          let headerRowIdx = -1;
-          let colIdx = { hari: -1, waktu: -1, matkul: -1, dosen: -1, ruang: -1 };
-
-          for (let i = 0; i < rows.length; i++) {
-            const row = rows[i].map(c => String(c).toLowerCase().trim());
-            
-            const hariIdx = row.findIndex(c => c.includes('hari') || c === 'day');
-            const waktuIdx = row.findIndex(c => c.includes('waktu') || c.includes('jam') || c === 'time');
-            const matkulIdx = row.findIndex(c => c.includes('mata kuliah') || c.includes('matkul') || c.includes('course'));
-            const dosenIdx = row.findIndex(c => c.includes('dosen') || c.includes('pengampu'));
-            const ruangIdx = row.findIndex(c => c.includes('ruang'));
-
-            // We need at least Hari, Waktu, Matkul, and Dosen to proceed
-            if (hariIdx > -1 && waktuIdx > -1 && matkulIdx > -1 && dosenIdx > -1) {
-              headerRowIdx = i;
-              colIdx = { hari: hariIdx, waktu: waktuIdx, matkul: matkulIdx, dosen: dosenIdx, ruang: ruangIdx };
-              break;
-            }
-          }
-
-          if (headerRowIdx === -1) {
-            throw new Error('Gagal menemukan baris header. Pastikan file memiliki kolom: Hari, Waktu, Mata Kuliah, dan Dosen Pengampu.');
-          }
-
           const parsedSchedules = [];
-          let lastHari = '';
 
-          // Parse Data Rows
-          for (let i = headerRowIdx + 1; i < rows.length; i++) {
-            const row = rows[i];
-            
-            // Fill down Hari if merged/empty
-            let currentHari = String(row[colIdx.hari] || '').trim();
-            if (!currentHari) {
-              currentHari = lastHari; // use previous
-            } else {
-              lastHari = currentHari;
+          if (groupType === 'uts' || groupType === 'uas') {
+            // Parser Khusus UTS / UAS
+            let currentDate = '';
+            let currentDay = '';
+            let currentStartTime = '';
+            let currentEndTime = '';
+
+            const monthMap: Record<string, string> = {
+              'januari': '01', 'februari': '02', 'maret': '03', 'april': '04', 'mei': '05', 'juni': '06',
+              'juli': '07', 'agustus': '08', 'september': '09', 'oktober': '10', 'november': '11', 'desember': '12'
+            };
+
+            for (let i = 0; i < rows.length; i++) {
+              const row = rows[i];
+              const colA = String(row[0] || '').trim();
+              
+              // Cek apakah baris header grup: "Senin, 6 April 2026 Jam: 08.00-09.40"
+              const headerMatch = colA.match(/^([a-zA-Z]+),\s+(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})\s*Jam:\s*(\d{1,2}[:\.-][0-5]\d)\s*-\s*(\d{1,2}[:\.-][0-5]\d)/i);
+              
+              if (headerMatch) {
+                currentDay = headerMatch[1];
+                const dayNum = headerMatch[2].padStart(2, '0');
+                const monthStr = headerMatch[3].toLowerCase();
+                const yearStr = headerMatch[4];
+                const monthNum = monthMap[monthStr] || '01';
+                currentDate = `${yearStr}-${monthNum}-${dayNum}`;
+                
+                currentStartTime = headerMatch[5].replace('.', ':').replace('-', ':').padStart(5, '0');
+                currentEndTime = headerMatch[6].replace('.', ':').replace('-', ':').padStart(5, '0');
+                continue; 
+              }
+
+              // Baris Data
+              const matkul = String(row[3] || '').trim(); // Kolom D: Matakuliah
+              const dosen = String(row[5] || '').trim();  // Kolom F: Dosen Pengampu
+              const ruang = String(row[8] || '').trim();  // Kolom I: Ruang
+
+              // Jika ini baris data yang valid (bukan header tabel)
+              if (currentDate && matkul && dosen && matkul.toLowerCase() !== 'matakuliah') {
+                parsedSchedules.push({
+                  day: currentDay,
+                  date: currentDate,
+                  startTime: currentStartTime,
+                  endTime: currentEndTime,
+                  activity: `Ujian: ${matkul}`,
+                  room: ruang,
+                  lecturerNames: dosen,
+                });
+              }
             }
 
-            const waktuRaw = String(row[colIdx.waktu] || '').trim();
-            const matkul = String(row[colIdx.matkul] || '').trim();
-            const dosen = String(row[colIdx.dosen] || '').trim();
-            const ruang = colIdx.ruang > -1 ? String(row[colIdx.ruang] || '').trim() : '';
-
-            // Skip empty rows
-            if (!waktuRaw || !matkul || !dosen) continue;
-
-            // Parse time range e.g. "07.30 - 10.00" or "07:30-10:00"
-            const timeMatch = waktuRaw.replace(/\s+/g, '').match(/^(\d{1,2}[:\.][0-5]\d)-(\d{1,2}[:\.][0-5]\d)$/);
-            let startTime = '', endTime = '';
-            
-            if (timeMatch) {
-              startTime = timeMatch[1].replace('.', ':').padStart(5, '0');
-              endTime = timeMatch[2].replace('.', ':').padStart(5, '0');
-            } else {
-              // try to parse if only one time is provided or split by space
-              continue; // skip invalid time for now
+            if (parsedSchedules.length === 0) {
+              throw new Error('Tidak ada jadwal ujian valid. Pastikan format teks seperti "Senin, 6 April 2026 Jam: 08.00-09.40" ada di kolom pertama.');
             }
 
-            parsedSchedules.push({
-              day: currentHari,
-              startTime,
-              endTime,
-              activity: matkul,
-              room: ruang,
-              lecturerNames: dosen,
-            });
-          }
+          } else {
+            // Parser Jadwal Kuliah Reguler
+            let headerRowIdx = -1;
+            let colIdx = { hari: -1, waktu: -1, matkul: -1, dosen: -1, ruang: -1 };
 
-          if (parsedSchedules.length === 0) {
-            throw new Error('Tidak ada data jadwal valid yang ditemukan di bawah baris header.');
+            for (let i = 0; i < rows.length; i++) {
+              const row = rows[i].map(c => String(c).toLowerCase().trim());
+              
+              const hariIdx = row.findIndex(c => c.includes('hari') || c === 'day');
+              const waktuIdx = row.findIndex(c => c.includes('waktu') || c.includes('jam') || c === 'time');
+              const matkulIdx = row.findIndex(c => c.includes('mata kuliah') || c.includes('matkul') || c.includes('course'));
+              const dosenIdx = row.findIndex(c => c.includes('dosen') || c.includes('pengampu'));
+              const ruangIdx = row.findIndex(c => c.includes('ruang'));
+
+              if (hariIdx > -1 && waktuIdx > -1 && matkulIdx > -1 && dosenIdx > -1) {
+                headerRowIdx = i;
+                colIdx = { hari: hariIdx, waktu: waktuIdx, matkul: matkulIdx, dosen: dosenIdx, ruang: ruangIdx };
+                break;
+              }
+            }
+
+            if (headerRowIdx === -1) {
+              throw new Error('Gagal menemukan baris header. Pastikan file memiliki kolom: Hari, Waktu, Mata Kuliah, dan Dosen Pengampu.');
+            }
+
+            let lastHari = '';
+
+            for (let i = headerRowIdx + 1; i < rows.length; i++) {
+              const row = rows[i];
+              
+              let currentHari = String(row[colIdx.hari] || '').trim();
+              if (!currentHari) {
+                currentHari = lastHari; 
+              } else {
+                lastHari = currentHari;
+              }
+
+              const waktuRaw = String(row[colIdx.waktu] || '').trim();
+              const matkul = String(row[colIdx.matkul] || '').trim();
+              const dosen = String(row[colIdx.dosen] || '').trim();
+              const ruang = colIdx.ruang > -1 ? String(row[colIdx.ruang] || '').trim() : '';
+
+              if (!waktuRaw || !matkul || !dosen) continue;
+
+              const timeMatch = waktuRaw.replace(/\s+/g, '').match(/^(\d{1,2}[:\.][0-5]\d)-(\d{1,2}[:\.][0-5]\d)$/);
+              let startTime = '', endTime = '';
+              
+              if (timeMatch) {
+                startTime = timeMatch[1].replace('.', ':').padStart(5, '0');
+                endTime = timeMatch[2].replace('.', ':').padStart(5, '0');
+              } else {
+                continue; 
+              }
+
+              parsedSchedules.push({
+                day: currentHari,
+                startTime,
+                endTime,
+                activity: matkul,
+                room: ruang,
+                lecturerNames: dosen,
+              });
+            }
+
+            if (parsedSchedules.length === 0) {
+              throw new Error('Tidak ada data jadwal valid yang ditemukan di bawah baris header.');
+            }
           }
 
           // Send to backend
