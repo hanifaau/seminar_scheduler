@@ -328,11 +328,11 @@ export default function PermohonanSeminarPage() {
   const handleDownloadExcel = () => {
     if (!requests) return;
     
-    // Filter scheduled requests
-    const scheduledRequests = requests.filter(r => r.status === 'scheduled');
+    // Filter scheduled and completed requests
+    const exportableRequests = requests.filter(r => r.status === 'scheduled' || r.status === 'completed');
     
-    if (scheduledRequests.length === 0) {
-      toast.error('Tidak ada agenda yang sudah terjadwal');
+    if (exportableRequests.length === 0) {
+      toast.error('Tidak ada agenda yang dapat diunduh (terjadwal / selesai)');
       return;
     }
 
@@ -343,7 +343,7 @@ export default function PermohonanSeminarPage() {
     };
 
     // Format data for Excel
-    const excelData = scheduledRequests.map(r => {
+    const excelData = exportableRequests.map(r => {
       let hari = '';
       if (r.scheduledDate) {
         const dateObj = new Date(r.scheduledDate);
@@ -351,6 +351,7 @@ export default function PermohonanSeminarPage() {
       }
 
       const waktu = (r.scheduledStartTime || r.scheduledTime) ? `${r.scheduledStartTime || r.scheduledTime} - ${r.scheduledEndTime || 'Selesai'}` : '';
+      const statusLabel = r.status === 'completed' ? 'Selesai' : 'Terjadwal';
 
       return {
         'Nama': r.studentName,
@@ -365,6 +366,7 @@ export default function PermohonanSeminarPage() {
         'Waktu': waktu,
         'Ruangan': r.scheduledRoom || '',
         'Jenis': SEMINAR_TYPES[r.type] || r.type,
+        'Status': statusLabel,
       };
     });
 
