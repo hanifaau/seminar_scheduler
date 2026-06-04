@@ -306,11 +306,13 @@ export const importSmartSchedule = mutation({
           if (!p) return false;
           // Abaikan jika bagian ini murni hanya berisi gelar
           const lower = p.toLowerCase().replace(/\./g, '').trim();
-          const titles = ['prof', 'dr', 'ir', 'st', 'mt', 'msc', 'meng', 'phd', 'eng', 'skom', 'ipu', 'aseaneng', 'msie', 'msi', 'mm', 'dreng', 'mengsc', 'stmt'];
+          const titles = ['prof', 'dr', 'ir', 'st', 'mt', 'msc', 'meng', 'phd', 'eng', 'skom', 'ipu', 'ipm', 'ipp', 'aseaneng', 'msie', 'msi', 'mm', 'dreng', 'mengsc', 'stmt', 'm', 's', 't', 'd'];
+          
+          const words = lower.split(' ').filter(Boolean);
+          if (words.length === 0) return false;
           
           // Cek apakah semua kata dalam string ini adalah gelar (misal: "prof dr eng")
-          const words = lower.split(' ').filter(Boolean);
-          if (words.length > 0 && words.every(w => titles.includes(w))) {
+          if (words.every(w => titles.includes(w))) {
             return false;
           }
           
@@ -331,8 +333,21 @@ export const importSmartSchedule = mutation({
       for (const keyword of keywords) {
         const matches = allLecturers.filter((lecturer) => {
           const dbName = lecturer.name.toLowerCase();
-          const keywordWords = keyword.toLowerCase().split(' ').filter(Boolean);
-          return keywordWords.every(w => dbName.includes(w));
+          const keywordWords = keyword.toLowerCase().replace(/\./g, '').split(' ').filter(Boolean);
+          
+          if (keywordWords.length === 0) return false;
+          
+          return keywordWords.every(w => {
+            if (dbName.includes(w)) return true;
+            // Jika kata kunci berupa singkatan pendek (misal: "rz" atau "rzadri"),
+            // cek apakah huruf-hurufnya muncul berurutan atau minimal ada di nama asli
+            if (w.length <= 3) {
+               // Gunakan inisial dari nama di database agar lebih akurat (misal: RZ -> Raimona Zadri)
+               const dbInitials = dbName.split(/[ \.,]/).filter(Boolean).map(word => word[0]);
+               return w.split('').every(char => dbInitials.includes(char));
+            }
+            return false;
+          });
         });
 
         if (matches.length === 0) {
