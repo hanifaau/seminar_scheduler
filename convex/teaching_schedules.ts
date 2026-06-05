@@ -360,20 +360,29 @@ export const importSmartSchedule = mutation({
             return arr[t.length][s.length];
           };
 
-          const matchCount = keywordWords.filter(w => {
-            if (dbName.includes(w)) return true;
-            if (w.length <= 3) {
-               const dbInitials = dbName.split(/[ \.,]/).filter(Boolean).map(word => word[0]);
-               return w.split('').every(char => dbInitials.includes(char));
-            }
-            const dbWords = dbName.replace(/[\.,]/g, '').split(' ').filter(Boolean);
-            return dbWords.some(dw => {
-               if (Math.abs(dw.length - w.length) > 1) return false;
-               return levenshteinDistance(dw, w) <= 2;
-            });
-          }).length;
+          const dbWords = dbName.replace(/[\.,]/g, '').split(' ').filter(Boolean);
+          let matchCount = 0;
           
-          return matchCount === keywordWords.length || (keywordWords.length > 1 && matchCount >= keywordWords.length - 1);
+          if (dbName === keyword.toLowerCase()) return true;
+
+          for (const kw of keywordWords) {
+            if (kw.length <= 2) continue; // Ignore initials
+            const isMatch = dbWords.some(dw => {
+              if (dw === kw) return true;
+              if (Math.abs(dw.length - kw.length) <= 1 && kw.length >= 4) {
+                 return levenshteinDistance(dw, kw) <= 1;
+              }
+              return false;
+            });
+            if (isMatch) matchCount++;
+          }
+
+          const validKwCount = keywordWords.filter(w => w.length > 2).length;
+          
+          if (validKwCount === 1 && matchCount === 1) return true;
+          if (validKwCount > 1 && matchCount >= 2) return true;
+          
+          return false;
         });
 
         if (matches.length === 0) {
