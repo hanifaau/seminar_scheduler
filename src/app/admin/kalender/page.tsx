@@ -13,17 +13,30 @@ export default function AcademicCalendarPage() {
   const [utsStartDate, setUtsStartDate] = useState('');
   const [utsEndDate, setUtsEndDate] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    if (settings) {
-      setSemesterStartDate(settings.semesterStartDate || '');
-      setUtsStartDate(settings.utsStartDate || '');
-      setUtsEndDate(settings.utsEndDate || '');
+    if (settings !== undefined) {
+      if (settings) {
+        setSemesterStartDate(settings.semesterStartDate || '');
+        setUtsStartDate(settings.utsStartDate || '');
+        setUtsEndDate(settings.utsEndDate || '');
+        // Default ke mode baca (read-only) jika sudah ada data
+        setIsEditing(false);
+      } else {
+        // Jika belum ada data sama sekali, otomatis mode edit
+        setIsEditing(true);
+      }
     }
   }, [settings]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isEditing) {
+      setIsEditing(true);
+      return;
+    }
+
     setIsSaving(true);
     try {
       await updateSettings({
@@ -32,6 +45,7 @@ export default function AcademicCalendarPage() {
         utsEndDate,
       });
       toast.success('Kalender Akademik berhasil diperbarui');
+      setIsEditing(false); // Kembali ke mode baca setelah simpan
     } catch (error) {
       console.error(error);
       toast.error('Gagal menyimpan kalender akademik');
@@ -65,9 +79,10 @@ export default function AcademicCalendarPage() {
             <input
               type="date"
               required
+              disabled={!isEditing}
               value={semesterStartDate}
               onChange={(e) => setSemesterStartDate(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
             />
             <p className="mt-1 text-sm text-gray-500">
               Digunakan untuk menghitung urutan minggu (Minggu ke-1, ke-2, dst) untuk jadwal Ganjil/Genap.
@@ -82,9 +97,10 @@ export default function AcademicCalendarPage() {
               <input
                 type="date"
                 required
+                disabled={!isEditing}
                 value={utsStartDate}
                 onChange={(e) => setUtsStartDate(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
               />
             </div>
             <div>
@@ -94,9 +110,10 @@ export default function AcademicCalendarPage() {
               <input
                 type="date"
                 required
+                disabled={!isEditing}
                 value={utsEndDate}
                 onChange={(e) => setUtsEndDate(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
               />
             </div>
           </div>
@@ -104,13 +121,31 @@ export default function AcademicCalendarPage() {
             Tanggal UTS akan otomatis dilompati (tidak dihitung sebagai minggu berjalan), dan digunakan sebagai batas pergantian dosen Team Teaching.
           </p>
 
-          <div className="pt-4 flex justify-end">
+          <div className="pt-4 flex justify-end gap-3">
+            {isEditing && settings && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(false);
+                  setSemesterStartDate(settings.semesterStartDate || '');
+                  setUtsStartDate(settings.utsStartDate || '');
+                  setUtsEndDate(settings.utsEndDate || '');
+                }}
+                className="px-6 py-2 rounded-lg font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Batal
+              </button>
+            )}
             <button
               type="submit"
               disabled={isSaving}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
+              className={`${
+                !isEditing
+                  ? 'bg-amber-500 hover:bg-amber-600'
+                  : 'bg-blue-600 hover:bg-blue-700'
+              } text-white px-6 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50`}
             >
-              {isSaving ? 'Menyimpan...' : 'Simpan Pengaturan'}
+              {isSaving ? 'Menyimpan...' : !isEditing ? 'Ubah Pengaturan' : 'Simpan Pengaturan'}
             </button>
           </div>
         </form>
