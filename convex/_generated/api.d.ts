@@ -9,6 +9,7 @@
  */
 
 import type * as crons from "../crons.js";
+import type * as delete_temp from "../delete_temp.js";
 import type * as expertise_categories from "../expertise_categories.js";
 import type * as lecturers from "../lecturers.js";
 import type * as notifications from "../notifications.js";
@@ -27,6 +28,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
+  delete_temp: typeof delete_temp;
   expertise_categories: typeof expertise_categories;
   lecturers: typeof lecturers;
   notifications: typeof notifications;

@@ -50,6 +50,18 @@ export default function ScheduleGroupsPage() {
     }
   };
 
+  const downloadTemplate = () => {
+    const ws_data = [
+      ['Mata Kuliah', 'Dosen Pengampu', 'Ruang', 'Hari', 'Tanggal', 'Waktu'],
+      ['Keselamatan dan Kesehatan Kerja', 'Hilma Raimona Zadri, S.T., M.Eng., Ph.D', 'G2.1', 'Senin', '10 April 2026', '08.00-09.40'],
+      ['Perancangan dan Pengembangan Produk', 'Difana Meilani, MISD', 'G1.10', 'Selasa', '11 April 2026', '10.00-11.40']
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Format Jadwal");
+    XLSX.writeFile(wb, "Template_Jadwal.xlsx");
+  };
+
   const processUpload = async () => {
     if (!selectedFile || !groupName) {
       toast.error('Nama jadwal dan file Excel wajib diisi');
@@ -79,153 +91,98 @@ export default function ScheduleGroupsPage() {
 
           const parsedSchedules = [];
 
-          if (groupType === 'uts' || groupType === 'uas') {
-            // Parser Khusus UTS / UAS
-            let currentDate = '';
-            let currentDay = '';
-            let currentStartTime = '';
-            let currentEndTime = '';
-            let currentMatkul = '';
-            let colIdx = { matkul: 3, dosen: 5, ruang: 8 };
+          // Unified Parser for both Regular and UTS/UAS
+          let headerRowIdx = -1;
+          let colIdx = { hari: -1, tanggal: -1, waktu: -1, matkul: -1, dosen: -1, ruang: -1 };
 
-            const monthMap: Record<string, string> = {
-              'januari': '01', 'februari': '02', 'maret': '03', 'april': '04', 'mei': '05', 'juni': '06',
-              'juli': '07', 'agustus': '08', 'september': '09', 'oktober': '10', 'november': '11', 'desember': '12'
-            };
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i].map(c => String(c).toLowerCase().trim());
+            
+            const hariIdx = row.findIndex(c => c.includes('hari') || c === 'day');
+            const tanggalIdx = row.findIndex(c => c.includes('tanggal') || c === 'date');
+            const waktuIdx = row.findIndex(c => c.includes('waktu') || c.includes('jam') || c === 'time');
+            const matkulIdx = row.findIndex(c => c.includes('mata kuliah') || c.includes('matkul') || c.includes('course'));
+            const dosenIdx = row.findIndex(c => c.includes('dosen') || c.includes('pengampu'));
+            const ruangIdx = row.findIndex(c => c.includes('ruang'));
 
-            // Cari indeks kolom dari header
-            for (let i = 0; i < Math.min(20, rows.length); i++) {
-              const row = rows[i].map(c => String(c).toLowerCase().trim());
-              const matkulIdx = row.findIndex(c => c.includes('mata kuliah') || c.includes('matkul') || c.includes('course'));
-              const dosenIdx = row.findIndex(c => c.includes('dosen') || c.includes('pengampu'));
-              const ruangIdx = row.findIndex(c => c.includes('ruang'));
-              
-              if (matkulIdx > -1 && dosenIdx > -1) {
-                colIdx = {
-                  matkul: matkulIdx,
-                  dosen: dosenIdx,
-                  ruang: ruangIdx > -1 ? ruangIdx : 8
-                };
-                break;
-              }
+            if ((hariIdx > -1 || tanggalIdx > -1) && waktuIdx > -1 && matkulIdx > -1 && dosenIdx > -1) {
+              headerRowIdx = i;
+              colIdx = { hari: hariIdx, tanggal: tanggalIdx, waktu: waktuIdx, matkul: matkulIdx, dosen: dosenIdx, ruang: ruangIdx };
+              break;
+            }
+          }
+
+          if (headerRowIdx === -1) {
+            throw new Error('Gagal menemukan baris header. Pastikan file memiliki kolom: Hari/Tanggal, Waktu, Mata Kuliah, dan Dosen.');
+          }
+
+          let lastHari = '';
+          let lastTanggal = '';
+
+          for (let i = headerRowIdx + 1; i < rows.length; i++) {
+            const row = rows[i];
+            
+            let currentHari = colIdx.hari > -1 ? String(row[colIdx.hari] || '').trim() : '';
+            if (!currentHari) currentHari = lastHari; else lastHari = currentHari;
+
+            let currentTanggal = colIdx.tanggal > -1 ? String(row[colIdx.tanggal] || '').trim() : '';
+            if (!currentTanggal) currentTanggal = lastTanggal; else lastTanggal = currentTanggal;
+
+            const waktuRaw = String(row[colIdx.waktu] || '').trim();
+            const matkulRaw = String(row[colIdx.matkul] || '').trim();
+            const dosen = String(row[colIdx.dosen] || '').trim();
+            const ruang = colIdx.ruang > -1 ? String(row[colIdx.ruang] || '').trim() : '';
+
+            if (!waktuRaw || !matkulRaw || !dosen) continue;
+
+            const timeMatch = waktuRaw.replace(/\s+/g, '').match(/^(\d{1,2}[:\.][0-5]\d)-(\d{1,2}[:\.][0-5]\d)$/);
+            let startTime = '', endTime = '';
+            
+            if (timeMatch) {
+              startTime = timeMatch[1].replace('.', ':').padStart(5, '0');
+              endTime = timeMatch[2].replace('.', ':').padStart(5, '0');
+            } else {
+              continue; 
             }
 
-            for (let i = 0; i < rows.length; i++) {
-              const row = rows[i];
-              const colA = String(row[0] || '').trim();
-              
-              // Cek apakah baris header grup: "Senin, 6 April 2026 Jam: 08.00-09.40"
-              const headerMatch = colA.match(/^([a-zA-Z]+),\s+(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})\s*Jam:\s*(\d{1,2}[:\.-][0-5]\d)\s*-\s*(\d{1,2}[:\.-][0-5]\d)/i);
-              
-              if (headerMatch) {
-                currentDay = headerMatch[1];
-                const dayNum = headerMatch[2].padStart(2, '0');
-                const monthStr = headerMatch[3].toLowerCase();
-                const yearStr = headerMatch[4];
-                const monthNum = monthMap[monthStr] || '01';
-                currentDate = `${yearStr}-${monthNum}-${dayNum}`;
-                
-                currentStartTime = headerMatch[5].replace('.', ':').replace('-', ':').padStart(5, '0');
-                currentEndTime = headerMatch[6].replace('.', ':').replace('-', ':').padStart(5, '0');
-                continue; 
+            const parseIndoDate = (str: string) => {
+              if (!isNaN(Number(str))) {
+                const excelDate = Number(str);
+                const date = new Date(Math.round((excelDate - 25569) * 86400 * 1000));
+                return date.toISOString().split('T')[0];
               }
-
-              // Baris Data menggunakan indeks kolom dinamis
-              const matkulRaw = String(row[colIdx.matkul] || '').trim();
-              const dosen = String(row[colIdx.dosen] || '').trim();
-              const ruang = String(row[colIdx.ruang] || '').trim();
-
-              // Jika matkulRaw ada isinya dan bukan header, simpan sebagai currentMatkul (untuk mengatasi merged cells)
-              if (matkulRaw && !matkulRaw.toLowerCase().includes('mata kuliah') && matkulRaw.toLowerCase() !== 'matakuliah') {
-                currentMatkul = matkulRaw;
+              const months: Record<string, string> = {
+                januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',
+                juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', desember: '12',
+                jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+                jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+              };
+              const match = str.toLowerCase().match(/(\d{1,2})[\s/-]+([a-z]+|\d{1,2})[\s/-]+(\d{4})/);
+              if (match) {
+                const [_, d, m, y] = match;
+                const month = isNaN(Number(m)) ? (months[m] || '01') : m.padStart(2, '0');
+                return `${y}-${month}-${d.padStart(2, '0')}`;
               }
-              const matkul = currentMatkul;
-
-              // Jika ini baris data yang valid (bukan header tabel)
-              if (currentDate && matkul && dosen && !dosen.toLowerCase().includes('dosen pengampu')) {
-                parsedSchedules.push({
-                  day: currentDay,
-                  date: currentDate,
-                  startTime: currentStartTime,
-                  endTime: currentEndTime,
-                  activity: `Ujian: ${matkul}`,
-                  room: ruang,
-                  lecturerNames: dosen,
-                });
-              }
+              if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+              return undefined;
             }
 
-            if (parsedSchedules.length === 0) {
-              throw new Error('Tidak ada jadwal ujian valid. Pastikan format teks seperti "Senin, 6 April 2026 Jam: 08.00-09.40" ada di kolom pertama.');
-            }
+            const activityPrefix = (groupType === 'uts' || groupType === 'uas') && !matkulRaw.toLowerCase().startsWith('ujian') ? 'Ujian: ' : '';
+            const activityName = activityPrefix + matkulRaw;
 
-          } else {
-            // Parser Jadwal Kuliah Reguler
-            let headerRowIdx = -1;
-            let colIdx = { hari: -1, waktu: -1, matkul: -1, dosen: -1, ruang: -1 };
+            parsedSchedules.push({
+              day: currentHari || 'Senin',
+              date: currentTanggal ? parseIndoDate(currentTanggal) : undefined,
+              startTime,
+              endTime,
+              activity: activityName,
+              room: ruang,
+              lecturerNames: dosen,
+            });
+          }
 
-            for (let i = 0; i < rows.length; i++) {
-              const row = rows[i].map(c => String(c).toLowerCase().trim());
-              
-              const hariIdx = row.findIndex(c => c.includes('hari') || c === 'day');
-              const waktuIdx = row.findIndex(c => c.includes('waktu') || c.includes('jam') || c === 'time');
-              const matkulIdx = row.findIndex(c => c.includes('mata kuliah') || c.includes('matkul') || c.includes('course'));
-              const dosenIdx = row.findIndex(c => c.includes('dosen') || c.includes('pengampu'));
-              const ruangIdx = row.findIndex(c => c.includes('ruang'));
-
-              if (hariIdx > -1 && waktuIdx > -1 && matkulIdx > -1 && dosenIdx > -1) {
-                headerRowIdx = i;
-                colIdx = { hari: hariIdx, waktu: waktuIdx, matkul: matkulIdx, dosen: dosenIdx, ruang: ruangIdx };
-                break;
-              }
-            }
-
-            if (headerRowIdx === -1) {
-              throw new Error('Gagal menemukan baris header. Pastikan file memiliki kolom: Hari, Waktu, Mata Kuliah, dan Dosen Pengampu.');
-            }
-
-            let lastHari = '';
-
-            for (let i = headerRowIdx + 1; i < rows.length; i++) {
-              const row = rows[i];
-              
-              let currentHari = String(row[colIdx.hari] || '').trim();
-              if (!currentHari) {
-                currentHari = lastHari; 
-              } else {
-                lastHari = currentHari;
-              }
-
-              const waktuRaw = String(row[colIdx.waktu] || '').trim();
-              const matkul = String(row[colIdx.matkul] || '').trim();
-              const dosen = String(row[colIdx.dosen] || '').trim();
-              const ruang = colIdx.ruang > -1 ? String(row[colIdx.ruang] || '').trim() : '';
-
-              if (!waktuRaw || !matkul || !dosen) continue;
-
-              const timeMatch = waktuRaw.replace(/\s+/g, '').match(/^(\d{1,2}[:\.][0-5]\d)-(\d{1,2}[:\.][0-5]\d)$/);
-              let startTime = '', endTime = '';
-              
-              if (timeMatch) {
-                startTime = timeMatch[1].replace('.', ':').padStart(5, '0');
-                endTime = timeMatch[2].replace('.', ':').padStart(5, '0');
-              } else {
-                continue; 
-              }
-
-              parsedSchedules.push({
-                day: currentHari,
-                startTime,
-                endTime,
-                activity: matkul,
-                room: ruang,
-                lecturerNames: dosen,
-              });
-            }
-
-            if (parsedSchedules.length === 0) {
-              throw new Error('Tidak ada data jadwal valid yang ditemukan di bawah baris header.');
-            }
+          if (parsedSchedules.length === 0) {
+            throw new Error('Tidak ada data jadwal valid yang ditemukan di bawah baris header.');
           }
 
           // Send to backend
@@ -264,10 +221,15 @@ export default function ScheduleGroupsPage() {
             Kelola kumpulan jadwal dosen (Reguler, UTS, UAS, dll) untuk pencarian slot seminar
           </p>
         </div>
-        <Button onClick={() => setIsUploadDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Unggah Jadwal Baru
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={downloadTemplate} className="border-emerald-600 text-emerald-600 hover:bg-emerald-50">
+            Unduh Format Excel
+          </Button>
+          <Button onClick={() => setIsUploadDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+            <Plus className="h-4 w-4 mr-2" />
+            Unggah Jadwal Baru
+          </Button>
+        </div>
       </div>
 
       {groups === undefined ? (
@@ -281,10 +243,15 @@ export default function ScheduleGroupsPage() {
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
             Unggah file jadwal Excel dari Kaprodi untuk mulai menggunakan sistem penjadwalan.
           </p>
-          <Button onClick={() => setIsUploadDialogOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            Unggah Sekarang
-          </Button>
+          <div className="flex justify-center gap-3">
+            <Button variant="outline" onClick={downloadTemplate}>
+              Unduh Format Excel
+            </Button>
+            <Button onClick={() => setIsUploadDialogOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Unggah Sekarang
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -417,9 +384,10 @@ export default function ScheduleGroupsPage() {
             <div className="space-y-5">
               <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-xl flex gap-3 text-sm text-blue-800 dark:text-blue-300">
                 <AlertTriangle className="h-5 w-5 shrink-0" />
-                <p>
-                  Sistem akan otomatis mendeteksi tabel jadwal Anda. Pastikan baris judul (header) mengandung teks seperti <strong>Mata Kuliah</strong>, <strong>Dosen</strong>, <strong>Hari</strong>, dan <strong>Waktu</strong>. File berformat <strong>.xlsx</strong> sangat disarankan.
-                </p>
+                <div className="space-y-2">
+                  <p>Sistem akan otomatis mendeteksi tabel jadwal Anda. Pastikan baris judul (header) mengandung teks seperti <strong>Mata Kuliah</strong>, <strong>Dosen</strong>, <strong>Ruang</strong>, <strong>Hari</strong>, <strong>Tanggal</strong>, dan <strong>Waktu</strong>. File berformat <strong>.xlsx</strong> sangat disarankan.</p>
+                  <p className="font-semibold text-blue-900 dark:text-blue-200">Catatan: Pastikan nama dosen sama dengan nama dosen yang tertera dalam sistem, cek kembali jadwal yang telah diupload.</p>
+                </div>
               </div>
 
               <div>

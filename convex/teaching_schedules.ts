@@ -340,17 +340,40 @@ export const importSmartSchedule = mutation({
           
           if (keywordWords.length === 0) return false;
           
-          return keywordWords.every(w => {
+          const levenshteinDistance = (s: string, t: string) => {
+            if (!s.length) return t.length;
+            if (!t.length) return s.length;
+            const arr = [];
+            for (let i = 0; i <= t.length; i++) {
+              arr[i] = [i];
+              for (let j = 1; j <= s.length; j++) {
+                arr[i][j] =
+                  i === 0
+                    ? j
+                    : Math.min(
+                        arr[i - 1][j] + 1,
+                        arr[i][j - 1] + 1,
+                        arr[i - 1][j - 1] + (s[j - 1] === t[i - 1] ? 0 : 1)
+                      );
+              }
+            }
+            return arr[t.length][s.length];
+          };
+
+          const matchCount = keywordWords.filter(w => {
             if (dbName.includes(w)) return true;
-            // Jika kata kunci berupa singkatan pendek (misal: "rz" atau "rzadri"),
-            // cek apakah huruf-hurufnya muncul berurutan atau minimal ada di nama asli
             if (w.length <= 3) {
-               // Gunakan inisial dari nama di database agar lebih akurat (misal: RZ -> Raimona Zadri)
                const dbInitials = dbName.split(/[ \.,]/).filter(Boolean).map(word => word[0]);
                return w.split('').every(char => dbInitials.includes(char));
             }
-            return false;
-          });
+            const dbWords = dbName.replace(/[\.,]/g, '').split(' ').filter(Boolean);
+            return dbWords.some(dw => {
+               if (Math.abs(dw.length - w.length) > 1) return false;
+               return levenshteinDistance(dw, w) <= 2;
+            });
+          }).length;
+          
+          return matchCount === keywordWords.length || (keywordWords.length > 1 && matchCount >= keywordWords.length - 1);
         });
 
         if (matches.length === 0) {
