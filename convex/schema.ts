@@ -1,10 +1,11 @@
+import { defineSchema, defineTable } from 'convex/server';
+import { v } from 'convex/values';
+
 export default defineSchema({
   // Settings table - stores global configuration like academic calendar
   settings: defineTable({
     key: v.string(),
     value: v.any(),
-    updatedAt: v.number(),
-  }).index('by_key', ['key']),
     updatedAt: v.number(),
   }).index('by_key', ['key']),
 
