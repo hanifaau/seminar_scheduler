@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export default function AcademicCalendarPage() {
   const settings = useQuery(api.settings.getAcademicCalendar);
