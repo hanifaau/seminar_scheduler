@@ -89,7 +89,7 @@ export default function AcademicCalendarPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tanggal Selesai UTS
+                Masa perkuliahan (setelah uts)
               </label>
               <input
                 type="date"
