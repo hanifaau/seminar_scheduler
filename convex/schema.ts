@@ -1,7 +1,13 @@
-import { defineSchema, defineTable } from 'convex/server';
-import { v } from 'convex/values';
-
 export default defineSchema({
+  // Settings table - stores global configuration like academic calendar
+  settings: defineTable({
+    key: v.string(),
+    value: v.any(),
+    updatedAt: v.number(),
+  }).index('by_key', ['key']),
+    updatedAt: v.number(),
+  }).index('by_key', ['key']),
+
   // Rooms table - stores available rooms for seminars and classes
   rooms: defineTable({
     name: v.string(), // e.g., "Ruang Seminar Lt.1"
@@ -88,6 +94,12 @@ export default defineSchema({
     activity: v.string(), // e.g., "Teaching", "Meeting", "Consultation"
     room: v.optional(v.string()),
     notes: v.optional(v.string()),
+    
+    // New fields for advanced scheduling
+    weekType: v.optional(v.union(v.literal('ganjil'), v.literal('genap'), v.literal('rutin'))),
+    teachingPeriod: v.optional(v.union(v.literal('sebelum_uts'), v.literal('setelah_uts'), v.literal('full'))),
+    isTeamTeaching: v.optional(v.boolean()),
+    
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
   })

@@ -90,13 +90,68 @@ function parseDayName(dateString: string): string {
   return dayMap[dayName] || dayName;
 }
 
+// Get Academic Calendar Settings
+async function getAcademicCalendarSettings(ctx: any) {
+  const record = await ctx.db
+    .query('settings')
+    .withIndex('by_key', (q: any) => q.eq('key', 'academic_calendar'))
+    .first();
+  return record?.value || null;
+}
+
+// Helper to determine if a schedule is active on a given date based on Ganjil/Genap and Sebelum/Sesudah UTS
+function isScheduleActiveOnDate(targetDateStr: string, schedule: any, settings: any): boolean {
+  const weekType = schedule.weekType || 'rutin';
+  const teachingPeriod = schedule.teachingPeriod || 'full';
+
+  if (weekType === 'rutin' && teachingPeriod === 'full') return true;
+
+  const targetDate = new Date(targetDateStr);
+  const semStart = settings?.semesterStartDate ? new Date(settings.semesterStartDate) : null;
+  const utsStart = settings?.utsStartDate ? new Date(settings.utsStartDate) : null;
+  const utsEnd = settings?.utsEndDate ? new Date(settings.utsEndDate) : null;
+
+  // 1. Check teachingPeriod
+  if (teachingPeriod === 'sebelum_uts' && utsStart) {
+    if (targetDate >= utsStart) return false; // Inactive during/after UTS
+  } else if (teachingPeriod === 'setelah_uts' && utsEnd) {
+    if (targetDate <= utsEnd) return false; // Inactive before/during UTS
+  }
+
+  // 2. Check weekType (ganjil/genap)
+  if (weekType !== 'rutin' && semStart) {
+    const diffTime = targetDate.getTime() - semStart.getTime();
+    if (diffTime >= 0) {
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      let weekNum = Math.floor(diffDays / 7) + 1; // 1-indexed
+
+      // Skip UTS weeks in calculation
+      if (utsStart && utsEnd) {
+        if (targetDate >= utsStart && targetDate <= utsEnd) {
+          return false; // Regular classes shouldn't happen during UTS anyway
+        } else if (targetDate > utsEnd) {
+          const utsDiffDays = Math.floor((utsEnd.getTime() - utsStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          const utsWeeks = Math.ceil(utsDiffDays / 7);
+          weekNum -= utsWeeks;
+        }
+      }
+
+      const isOddWeek = weekNum % 2 !== 0;
+      if (weekType === 'ganjil' && !isOddWeek) return false;
+      if (weekType === 'genap' && isOddWeek) return false;
+    }
+  }
+
+  return true;
+}
+
 // Get lecturer busy slots for a specific day (including transition gap and details)
 async function getLecturerBusySlotsForDate(
   ctx: any,
   lecturerId: string,
   day: string,
-  date: string
-
+  date: string,
+  settings: any
 ): Promise<LecturerBusySlot[]> {
   const schedules = await ctx.db
     .query('teaching_schedules')
@@ -121,7 +176,11 @@ async function getLecturerBusySlotsForDate(
     
     const isDayMatch = isRoutineMatch || isSpecificDateMatch;
     const isActive = s.groupId ? activeGroupIds.has(s.groupId.toString()) : true; // keep legacy schedules active
-    return isDayMatch && isActive;
+    
+    if (!isDayMatch || !isActive) return false;
+
+    // 3. Apply advanced academic calendar rules (Ganjil/Genap, Sebelum/Sesudah UTS)
+    return isScheduleActiveOnDate(date, s, settings);
   });
 
   return daySchedules.map((s: any) => ({
@@ -350,6 +409,8 @@ export const getAvailableSlots = query({
     const weekOffset = args.weekOffset || 0;
     const weekDates = generateWeekDates(startDate, weekOffset);
 
+    const settings = await getAcademicCalendarSettings(ctx);
+
     const idealSlots: TimeSlot[] = [];
     const alternativeSlots: TimeSlot[] = [];
 
@@ -359,7 +420,7 @@ export const getAvailableSlots = query({
       const allLecturerBusySlots: LecturerBusySlot[][] = [];
 
       for (const lecturerId of lecturerIds) {
-        const busySlots = await getLecturerBusySlotsForDate(ctx, lecturerId, dateInfo.day, dateInfo.date);
+        const busySlots = await getLecturerBusySlotsForDate(ctx, lecturerId, dateInfo.day, dateInfo.date, settings);
         allLecturerBusySlots.push(busySlots);
       }
 
@@ -641,6 +702,8 @@ export const checkSlotAvailability = query({
       .collect();
     const activeGroupIds = new Set(activeGroups.map((g: any) => g._id.toString()));
 
+    const settings = await getAcademicCalendarSettings(ctx);
+
     for (const lecturerId of lecturerIds) {
       const schedules = await ctx.db
         .query('teaching_schedules')
@@ -652,6 +715,7 @@ export const checkSlotAvailability = query({
       for (const schedule of schedules) {
         if (parseDayName(schedule.day) !== dayName) continue;
         if (schedule.groupId && !activeGroupIds.has(schedule.groupId.toString())) continue;
+        if (!isScheduleActiveOnDate(args.date, schedule, settings)) continue;
 
         const scheduleStart = timeToMinutes(schedule.startTime);
         const scheduleEnd = timeToMinutes(schedule.endTime);
@@ -748,10 +812,12 @@ export const getAvailableRooms = query({
       s.groupId ? activeGroupIds.has(s.groupId.toString()) : true
     );
 
+    const settings = await getAcademicCalendarSettings(ctx);
     const usedRoomsInClasses = new Set<string>();
 
     for (const schedule of daySchedules) {
       if (!schedule.room) continue;
+      if (!isScheduleActiveOnDate(args.date, schedule, settings)) continue;
 
       const scheduleStart = timeToMinutes(schedule.startTime);
       const scheduleEnd = timeToMinutes(schedule.endTime);

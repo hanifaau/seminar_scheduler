@@ -178,6 +178,9 @@ export const update = mutation({
     activity: v.optional(v.string()),
     room: v.optional(v.string()),
     notes: v.optional(v.string()),
+    weekType: v.optional(v.union(v.literal('ganjil'), v.literal('genap'), v.literal('rutin'))),
+    teachingPeriod: v.optional(v.union(v.literal('sebelum_uts'), v.literal('setelah_uts'), v.literal('full'))),
+    isTeamTeaching: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
@@ -268,6 +271,44 @@ export const removeAllByLecturer = mutation({
 });
 
 // --- SMART IMPORT LOGIC ---
+
+export const getTeamTeachingSchedules = query({
+  args: {},
+  handler: async (ctx) => {
+    const schedules = await ctx.db
+      .query('teaching_schedules')
+      .order('asc')
+      .collect();
+      
+    const teamSchedules = schedules.filter(s => s.isTeamTeaching === true);
+
+    return await Promise.all(
+      teamSchedules.map(async (schedule) => {
+        const lecturer = await ctx.db.get(schedule.lecturerId);
+        const group = schedule.groupId ? await ctx.db.get(schedule.groupId) : null;
+        return {
+          ...schedule,
+          lecturer,
+          group,
+        };
+      })
+    );
+  },
+});
+
+export const updateTeachingPeriod = mutation({
+  args: {
+    id: v.id('teaching_schedules'),
+    teachingPeriod: v.union(v.literal('sebelum_uts'), v.literal('setelah_uts'), v.literal('full')),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      teachingPeriod: args.teachingPeriod,
+      updatedAt: Date.now(),
+    });
+    return args.id;
+  },
+});
 
 export const importSmartSchedule = mutation({
   args: {
@@ -410,6 +451,18 @@ export const importSmartSchedule = mutation({
           continue;
         }
 
+        let finalActivity = activity.trim();
+        let weekType: 'ganjil' | 'genap' | 'rutin' = 'rutin';
+        if (finalActivity.toLowerCase().includes('(ganjil)')) {
+          weekType = 'ganjil';
+          finalActivity = finalActivity.replace(/\(ganjil\)/i, '').trim();
+        } else if (finalActivity.toLowerCase().includes('(genap)')) {
+          weekType = 'genap';
+          finalActivity = finalActivity.replace(/\(genap\)/i, '').trim();
+        }
+
+        const isTeamTeaching = matchedLecturerIds.size > 1;
+
         await ctx.db.insert('teaching_schedules', {
           lecturerId: lecturerId,
           groupId: args.groupId,
@@ -417,8 +470,11 @@ export const importSmartSchedule = mutation({
           date: date || undefined,
           startTime,
           endTime,
-          activity,
+          activity: finalActivity,
           room: room || undefined,
+          weekType,
+          teachingPeriod: 'full',
+          isTeamTeaching,
           createdAt: now,
         });
 

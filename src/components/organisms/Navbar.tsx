@@ -36,6 +36,8 @@ const adminNavItems = [
   { href: '/admin/dosen', label: 'Data Dosen', icon: Users },
   { href: '/admin/ruangan', label: 'Data Ruangan', icon: Home },
   { href: '/admin/jadwal/unggah', label: 'Kelola Jadwal', icon: CalendarClock },
+  { href: '/admin/jadwal/konfirmasi', label: 'Team Teaching', icon: Users },
+  { href: '/admin/kalender', label: 'Kalender Akademik', icon: Calendar },
   { href: '/admin/staff', label: 'Pegawai', icon: Users },
   { href: '/admin/roles', label: 'Pengaturan Jabatan', icon: UserCog },
 ];
