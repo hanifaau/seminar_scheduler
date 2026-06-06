@@ -666,32 +666,91 @@ export default function JadwalSeminarPage() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Jam Mulai</label>
-                        <input 
-                          type="time" 
-                          className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          value={manualStartTime}
-                          onChange={(e) => {
-                            setManualStartTime(e.target.value);
-                            // Auto calculate end time
-                            if (e.target.value && selectedRequest) {
-                              const duration = selectedRequest.type === 'Sidang' ? 120 : 90;
-                              const [h, m] = e.target.value.split(':').map(Number);
-                              const endMins = h * 60 + m + duration;
-                              const endH = Math.floor(endMins / 60).toString().padStart(2, '0');
-                              const endM = (endMins % 60).toString().padStart(2, '0');
-                              setManualEndTime(`${endH}:${endM}`);
-                            }
-                          }}
-                        />
+                        <div className="flex gap-2">
+                          <select 
+                            className="flex-1 h-10 rounded-md border border-input bg-background px-2 py-2 text-sm"
+                            value={manualStartTime.split(':')[0] || ''}
+                            onChange={(e) => {
+                              const h = e.target.value;
+                              const m = manualStartTime.split(':')[1] || '00';
+                              const newTime = `${h}:${m}`;
+                              setManualStartTime(newTime);
+                              if (newTime.length === 5 && selectedRequest) {
+                                const duration = selectedRequest.type === 'Sidang' ? 120 : 90;
+                                const endMins = parseInt(h) * 60 + parseInt(m) + duration;
+                                const endH = Math.floor(endMins / 60).toString().padStart(2, '0');
+                                const endM = (endMins % 60).toString().padStart(2, '0');
+                                setManualEndTime(`${endH}:${endM}`);
+                              }
+                            }}
+                          >
+                            <option value="" disabled>Jam</option>
+                            {Array.from({ length: 12 }, (_, i) => i + 7).map(h => {
+                              const hour = h.toString().padStart(2, '0');
+                              return <option key={hour} value={hour}>{hour}</option>;
+                            })}
+                          </select>
+                          <span className="flex items-center font-bold">:</span>
+                          <select 
+                            className="flex-1 h-10 rounded-md border border-input bg-background px-2 py-2 text-sm"
+                            value={manualStartTime.split(':')[1] || ''}
+                            onChange={(e) => {
+                              const h = manualStartTime.split(':')[0] || '08';
+                              const m = e.target.value;
+                              const newTime = `${h}:${m}`;
+                              setManualStartTime(newTime);
+                              if (newTime.length === 5 && selectedRequest) {
+                                const duration = selectedRequest.type === 'Sidang' ? 120 : 90;
+                                const endMins = parseInt(h) * 60 + parseInt(m) + duration;
+                                const endH = Math.floor(endMins / 60).toString().padStart(2, '0');
+                                const endM = (endMins % 60).toString().padStart(2, '0');
+                                setManualEndTime(`${endH}:${endM}`);
+                              }
+                            }}
+                          >
+                            <option value="" disabled>Mnt</option>
+                            {Array.from({ length: 12 }, (_, i) => i * 5).map(m => {
+                              const min = m.toString().padStart(2, '0');
+                              return <option key={min} value={min}>{min}</option>;
+                            })}
+                          </select>
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Jam Selesai</label>
-                        <input 
-                          type="time" 
-                          className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          value={manualEndTime}
-                          onChange={(e) => setManualEndTime(e.target.value)}
-                        />
+                        <div className="flex gap-2">
+                          <select 
+                            className="flex-1 h-10 rounded-md border border-input bg-background px-2 py-2 text-sm"
+                            value={manualEndTime.split(':')[0] || ''}
+                            onChange={(e) => {
+                              const h = e.target.value;
+                              const m = manualEndTime.split(':')[1] || '00';
+                              setManualEndTime(`${h}:${m}`);
+                            }}
+                          >
+                            <option value="" disabled>Jam</option>
+                            {Array.from({ length: 13 }, (_, i) => i + 7).map(h => {
+                              const hour = h.toString().padStart(2, '0');
+                              return <option key={hour} value={hour}>{hour}</option>;
+                            })}
+                          </select>
+                          <span className="flex items-center font-bold">:</span>
+                          <select 
+                            className="flex-1 h-10 rounded-md border border-input bg-background px-2 py-2 text-sm"
+                            value={manualEndTime.split(':')[1] || ''}
+                            onChange={(e) => {
+                              const h = manualEndTime.split(':')[0] || '09';
+                              const m = e.target.value;
+                              setManualEndTime(`${h}:${m}`);
+                            }}
+                          >
+                            <option value="" disabled>Mnt</option>
+                            {Array.from({ length: 12 }, (_, i) => i * 5).map(m => {
+                              const min = m.toString().padStart(2, '0');
+                              return <option key={min} value={min}>{min}</option>;
+                            })}
+                          </select>
+                        </div>
                       </div>
                     </div>
 
