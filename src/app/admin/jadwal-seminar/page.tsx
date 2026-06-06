@@ -96,6 +96,12 @@ export default function JadwalSeminarPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [weekOffset, setWeekOffset] = React.useState(0);
 
+  // Manual Mode States
+  const [isManualMode, setIsManualMode] = React.useState(false);
+  const [manualDate, setManualDate] = React.useState('');
+  const [manualStartTime, setManualStartTime] = React.useState('');
+  const [manualEndTime, setManualEndTime] = React.useState('');
+
   // WhatsApp notification states
   const [sendNotification, setSendNotification] = React.useState(false);
   const [isSendingNotification, setIsSendingNotification] = React.useState(false);
@@ -116,6 +122,16 @@ export default function JadwalSeminarPage() {
       : 'skip'
   );
 
+  const manualCheckArgs = isManualMode && manualDate && manualStartTime && manualEndTime && selectedRequest
+    ? {
+        seminarRequestId: selectedRequest._id as any,
+        date: manualDate,
+        startTime: manualStartTime,
+        endTime: manualEndTime,
+      }
+    : 'skip';
+  const manualAvailability = useQuery(api.scheduling.checkSlotAvailability, manualCheckArgs);
+
   // Mutations & Actions
   const scheduleSeminar = useMutation(api.scheduling.scheduleSeminar);
   const cancelSchedule = useMutation(api.seminar_requests.cancelSchedule);
@@ -130,6 +146,10 @@ export default function JadwalSeminarPage() {
     setSendNotification(false);
     setNotificationResults(null);
     setIsScheduledSuccess(false);
+    setIsManualMode(false);
+    setManualDate('');
+    setManualStartTime('');
+    setManualEndTime('');
   };
 
   const handleSelectSlot = (slot: TimeSlot) => {
@@ -277,6 +297,10 @@ export default function JadwalSeminarPage() {
     setSendNotification(false);
     setNotificationResults(null);
     setIsScheduledSuccess(false);
+    setIsManualMode(false);
+    setManualDate('');
+    setManualStartTime('');
+    setManualEndTime('');
   };
 
   const isLoadingAllocated = allocatedRequests === undefined;
@@ -600,7 +624,141 @@ export default function JadwalSeminarPage() {
 
               {/* Slot Picker */}
               <div className="rounded-lg border p-4">
-                {availableSlots === undefined ? (
+                <div className="flex border-b mb-4">
+                  <button
+                    className={cn(
+                      "flex-1 py-2 text-sm font-semibold border-b-2 transition-colors",
+                      !isManualMode 
+                        ? "border-primary text-primary" 
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => setIsManualMode(false)}
+                  >
+                    Rekomendasi Sistem
+                  </button>
+                  <button
+                    className={cn(
+                      "flex-1 py-2 text-sm font-semibold border-b-2 transition-colors",
+                      isManualMode 
+                        ? "border-primary text-primary" 
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                    onClick={() => {
+                      setIsManualMode(true);
+                      setSelectedSlot(null);
+                    }}
+                  >
+                    Input Manual
+                  </button>
+                </div>
+
+                {isManualMode ? (
+                  <div className="space-y-4 p-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Tanggal</label>
+                        <input 
+                          type="date" 
+                          className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={manualDate}
+                          onChange={(e) => setManualDate(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Jam Mulai</label>
+                        <input 
+                          type="time" 
+                          className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={manualStartTime}
+                          onChange={(e) => {
+                            setManualStartTime(e.target.value);
+                            // Auto calculate end time
+                            if (e.target.value && selectedRequest) {
+                              const duration = selectedRequest.type === 'Proposal' ? 60 : 90;
+                              const [h, m] = e.target.value.split(':').map(Number);
+                              const endMins = h * 60 + m + duration;
+                              const endH = Math.floor(endMins / 60).toString().padStart(2, '0');
+                              const endM = (endMins % 60).toString().padStart(2, '0');
+                              setManualEndTime(`${endH}:${endM}`);
+                            }
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Jam Selesai</label>
+                        <input 
+                          type="time" 
+                          className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={manualEndTime}
+                          onChange={(e) => setManualEndTime(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {manualDate && manualStartTime && manualEndTime && (
+                      <div className="mt-4 p-4 rounded-lg border bg-muted/20">
+                        {manualAvailability === undefined ? (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Mengecek ketersediaan...
+                          </div>
+                        ) : manualAvailability.available ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-green-600">
+                              <CheckCircle className="h-5 w-5" />
+                              <span className="font-medium">Waktu aman dan tidak bentrok!</span>
+                            </div>
+                            <Button 
+                              onClick={() => {
+                                setSelectedSlot({
+                                  date: manualDate,
+                                  startTime: manualStartTime,
+                                  endTime: manualEndTime,
+                                  isAvailable: true,
+                                  score: 100
+                                });
+                              }}
+                              variant="outline"
+                              className="w-full border-green-600 text-green-600 hover:bg-green-50"
+                            >
+                              Gunakan Waktu Ini
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-red-600 mb-2">
+                              <AlertTriangle className="h-5 w-5" />
+                              <span className="font-medium">Terdapat Bentrok:</span>
+                            </div>
+                            <ul className="list-disc pl-5 space-y-1 text-sm text-red-600/80">
+                              {manualAvailability.conflicts.map((c: string, i: number) => (
+                                <li key={i}>{c}</li>
+                              ))}
+                            </ul>
+                            <div className="pt-2">
+                              <Button 
+                                onClick={() => {
+                                  if (window.confirm('YAKIN INGIN MEMAKSA JADWAL INI? Jadwal akan berbenturan dengan agenda lain.')) {
+                                    setSelectedSlot({
+                                      date: manualDate,
+                                      startTime: manualStartTime,
+                                      endTime: manualEndTime,
+                                      isAvailable: false,
+                                      conflicts: manualAvailability.conflicts
+                                    });
+                                  }
+                                }}
+                                variant="outline"
+                                className="w-full border-red-200 text-red-600 hover:bg-red-50 text-xs"
+                              >
+                                Tetap Gunakan (Paksa)
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : availableSlots === undefined ? (
                   <div className="flex flex-col items-center justify-center py-12 space-y-4">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     <p className="text-muted-foreground">Mencari slot tersedia...</p>
