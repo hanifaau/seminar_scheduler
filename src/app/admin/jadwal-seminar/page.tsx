@@ -616,7 +616,7 @@ export default function JadwalSeminarPage() {
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <Clock className="h-3 w-3" />
                     <span>
-                      Durasi: {selectedRequest.type === 'Proposal' ? '60' : '90'} menit
+                      Durasi: {selectedRequest.type === 'Sidang' ? '120' : '90'} menit
                     </span>
                   </div>
                 </div>
@@ -674,7 +674,7 @@ export default function JadwalSeminarPage() {
                             setManualStartTime(e.target.value);
                             // Auto calculate end time
                             if (e.target.value && selectedRequest) {
-                              const duration = selectedRequest.type === 'Proposal' ? 60 : 90;
+                              const duration = selectedRequest.type === 'Sidang' ? 120 : 90;
                               const [h, m] = e.target.value.split(':').map(Number);
                               const endMins = h * 60 + m + duration;
                               const endH = Math.floor(endMins / 60).toString().padStart(2, '0');
