@@ -453,12 +453,16 @@ export const importSmartSchedule = mutation({
 
         let finalActivity = activity.trim();
         let weekType: 'ganjil' | 'genap' | 'rutin' = 'rutin';
-        if (finalActivity.toLowerCase().includes('(ganjil)')) {
+        
+        const ganjilRegex = /[\(\[\-]?\s*ganjil\s*[\)\]]?/i;
+        const genapRegex = /[\(\[\-]?\s*genap\s*[\)\]]?/i;
+
+        if (ganjilRegex.test(finalActivity)) {
           weekType = 'ganjil';
-          finalActivity = finalActivity.replace(/\(ganjil\)/i, '').trim();
-        } else if (finalActivity.toLowerCase().includes('(genap)')) {
+          finalActivity = finalActivity.replace(ganjilRegex, '').trim();
+        } else if (genapRegex.test(finalActivity)) {
           weekType = 'genap';
-          finalActivity = finalActivity.replace(/\(genap\)/i, '').trim();
+          finalActivity = finalActivity.replace(genapRegex, '').trim();
         }
 
         const isTeamTeaching = matchedLecturerIds.size > 1;
