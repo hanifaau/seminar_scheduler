@@ -28,7 +28,7 @@ interface LecturerBusySlot {
 }
 
 // Working hours configuration
-const WORK_START = 8 * 60; // 08:00 in minutes
+const WORK_START = 7 * 60 + 30; // 07:30 in minutes
 const WORK_END = 17 * 60 + 40; // 17:40 in minutes
 const TRANSITION_GAP = 5; // 5 minutes transition buffer
 const MAX_RECOMMENDATIONS = 30; // Maximum slots to return
@@ -42,7 +42,7 @@ const DURATION_REQUIREMENTS: Record<string, number> = {
 
 // Global break times
 const GLOBAL_BREAKS = [
-  { start: '12:00', end: '13:30', name: 'Istirahat Siang' },
+  { start: '12:50', end: '13:30', name: 'Istirahat Siang' },
   { start: '15:40', end: '16:00', name: 'Istirahat Ashar' },
 ];
 
