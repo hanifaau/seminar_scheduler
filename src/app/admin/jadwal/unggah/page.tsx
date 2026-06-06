@@ -135,6 +135,14 @@ export default function ScheduleGroupsPage() {
 
             if (!waktuRaw || !matkulRaw || !dosen) continue;
 
+            // Cerdas: Cari kata ganjil/genap di seluruh sel dalam baris ini (jika user menaruh di kolom terpisah)
+            let rowWeekType = '';
+            for (let j = 0; j < row.length; j++) {
+              const cellText = String(row[j]).toLowerCase();
+              if (cellText.includes('ganjil')) rowWeekType = ' (Ganjil)';
+              else if (cellText.includes('genap')) rowWeekType = ' (Genap)';
+            }
+
             const timeMatch = waktuRaw.replace(/\s+/g, '').match(/^(\d{1,2}[:\.][0-5]\d)-(\d{1,2}[:\.][0-5]\d)$/);
             let startTime = '', endTime = '';
             
@@ -168,7 +176,7 @@ export default function ScheduleGroupsPage() {
             }
 
             const activityPrefix = (groupType === 'uts' || groupType === 'uas') && !matkulRaw.toLowerCase().startsWith('ujian') ? 'Ujian: ' : '';
-            const activityName = activityPrefix + matkulRaw;
+            const activityName = activityPrefix + matkulRaw + rowWeekType;
 
             parsedSchedules.push({
               day: currentHari || 'Senin',
