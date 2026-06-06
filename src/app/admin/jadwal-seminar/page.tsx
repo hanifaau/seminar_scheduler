@@ -709,12 +709,14 @@ export default function JadwalSeminarPage() {
                             </div>
                             <Button 
                               onClick={() => {
+                                const dayName = new Date(manualDate).toLocaleDateString('id-ID', { weekday: 'long' });
                                 setSelectedSlot({
+                                  day: dayName,
                                   date: manualDate,
                                   startTime: manualStartTime,
                                   endTime: manualEndTime,
-                                  isAvailable: true,
-                                  score: 100
+                                  type: 'ideal',
+                                  availableDuration: selectedRequest?.type === 'Sidang' ? 120 : 90
                                 });
                               }}
                               variant="outline"
@@ -738,12 +740,14 @@ export default function JadwalSeminarPage() {
                               <Button 
                                 onClick={() => {
                                   if (window.confirm('YAKIN INGIN MEMAKSA JADWAL INI? Jadwal akan berbenturan dengan agenda lain.')) {
+                                    const dayName = new Date(manualDate).toLocaleDateString('id-ID', { weekday: 'long' });
                                     setSelectedSlot({
+                                      day: dayName,
                                       date: manualDate,
                                       startTime: manualStartTime,
                                       endTime: manualEndTime,
-                                      isAvailable: false,
-                                      conflicts: manualAvailability.conflicts
+                                      type: 'alternative',
+                                      availableDuration: selectedRequest?.type === 'Sidang' ? 120 : 90
                                     });
                                   }
                                 }}
