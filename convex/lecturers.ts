@@ -280,12 +280,7 @@ export const getKaprodi = query({
       .withIndex('by_role', (q) => q.eq('role', 'kaprodi'))
       .collect();
 
-    // Filter to only active
-    const activeKaprodi = kaprodiList.filter(
-      (l) => l.status === 'active' || !l.status
-    );
-
-    return activeKaprodi[0] || null;
+    return kaprodiList[0] || null;
   },
 });
 
@@ -298,12 +293,7 @@ export const getSekprodi = query({
       .withIndex('by_role', (q) => q.eq('role', 'sekprodi'))
       .collect();
 
-    // Filter to only active
-    const activeSekprodi = sekprodiList.filter(
-      (l) => l.status === 'active' || !l.status
-    );
-
-    return activeSekprodi[0] || null;
+    return sekprodiList[0] || null;
   },
 });
 
@@ -323,8 +313,8 @@ export const getLeadership = query({
     ]);
 
     return {
-      kaprodi: kaprodi.find((l) => l.status === 'active' || !l.status) || null,
-      sekprodi: sekprodi.find((l) => l.status === 'active' || !l.status) || null,
+      kaprodi: kaprodi[0] || null,
+      sekprodi: sekprodi[0] || null,
     };
   },
 });
@@ -353,7 +343,7 @@ export const assignRole = mutation({
         .collect();
 
       const activeRoleHolder = existingRoleHolders.find(
-        (l) => (l.status === 'active' || !l.status) && l._id !== args.id
+        (l) => l._id !== args.id
       );
 
       if (activeRoleHolder) {
@@ -421,7 +411,7 @@ export const updateWithRole = mutation({
         .collect();
 
       const activeRoleHolder = existingRoleHolders.find(
-        (l) => (l.status === 'active' || !l.status) && l._id !== id
+        (l) => l._id !== id
       );
 
       if (activeRoleHolder) {

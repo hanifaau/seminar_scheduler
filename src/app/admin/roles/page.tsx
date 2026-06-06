@@ -62,11 +62,8 @@ export default function RoleAssignmentPage() {
   const assignRole = useMutation(api.lecturers.assignRole);
   const removeRole = useMutation(api.lecturers.removeRole);
 
-  // Filter active lecturers
-  const activeLecturers = React.useMemo(() => {
-    if (!lecturers) return [];
-    return lecturers.filter((l) => l.status === 'active' || !l.status);
-  }, [lecturers]);
+  // We no longer filter out inactive lecturers for role assignment
+  const activeLecturers = lecturers || [];
 
   // Get current role holders
   const currentKaprodi = leadership?.kaprodi;
