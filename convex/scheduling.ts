@@ -184,8 +184,8 @@ async function getLecturerBusySlotsForDate(
   });
 
   return daySchedules.map((s: any) => ({
-    startTime: timeToMinutes(s.startTime) - TRANSITION_GAP, // Add buffer before
-    endTime: timeToMinutes(s.endTime) + TRANSITION_GAP, // Add buffer after
+    startTime: (s.startMinutes !== undefined ? s.startMinutes : timeToMinutes(s.startTime)) - TRANSITION_GAP, // Add buffer before
+    endTime: (s.endMinutes !== undefined ? s.endMinutes : timeToMinutes(s.endTime)) + TRANSITION_GAP, // Add buffer after
     lecturerId,
     lecturerName,
     activity: s.activity,
@@ -219,8 +219,8 @@ async function getScheduledSeminarsForDate(
   });
 
   return relevantSeminars.map((s: any) => ({
-    startTime: timeToMinutes(s.scheduledStartTime || s.scheduledTime || '08:00'),
-    endTime: timeToMinutes(s.scheduledEndTime || '10:00'),
+    startTime: s.scheduledStartMinutes !== undefined ? s.scheduledStartMinutes : timeToMinutes(s.scheduledStartTime || s.scheduledTime || '08:00'),
+    endTime: s.scheduledEndMinutes !== undefined ? s.scheduledEndMinutes : timeToMinutes(s.scheduledEndTime || '10:00'),
     activity: `Seminar ${s.studentName}`,
   }));
 }
@@ -611,6 +611,8 @@ export const scheduleSeminar = mutation({
       scheduledTime: args.scheduledStartTime, // For backward compatibility
       scheduledStartTime: args.scheduledStartTime,
       scheduledEndTime: args.scheduledEndTime,
+      scheduledStartMinutes: timeToMinutes(args.scheduledStartTime),
+      scheduledEndMinutes: timeToMinutes(args.scheduledEndTime),
       scheduledRoom: args.scheduledRoom,
       status: 'waiting_confirmation',
       updatedAt: Date.now(),
@@ -717,8 +719,8 @@ export const checkSlotAvailability = query({
         if (schedule.groupId && !activeGroupIds.has(schedule.groupId.toString())) continue;
         if (!isScheduleActiveOnDate(args.date, schedule, settings)) continue;
 
-        const scheduleStart = timeToMinutes(schedule.startTime);
-        const scheduleEnd = timeToMinutes(schedule.endTime);
+        const scheduleStart = schedule.startMinutes !== undefined ? schedule.startMinutes : timeToMinutes(schedule.startTime);
+        const scheduleEnd = schedule.endMinutes !== undefined ? schedule.endMinutes : timeToMinutes(schedule.endTime);
 
         // Check for overlap (with transition buffer)
         if (
@@ -747,8 +749,8 @@ export const checkSlotAvailability = query({
     for (const seminar of scheduledSeminars) {
       if (seminar._id === args.seminarRequestId) continue;
 
-      const seminarStart = timeToMinutes(seminar.scheduledStartTime || seminar.scheduledTime || '08:00');
-      const seminarEnd = timeToMinutes(seminar.scheduledEndTime || '10:00');
+      const seminarStart = seminar.scheduledStartMinutes !== undefined ? seminar.scheduledStartMinutes : timeToMinutes(seminar.scheduledStartTime || seminar.scheduledTime || '08:00');
+      const seminarEnd = seminar.scheduledEndMinutes !== undefined ? seminar.scheduledEndMinutes : timeToMinutes(seminar.scheduledEndTime || '10:00');
 
       if (startMinutes < seminarEnd && endMinutes > seminarStart) {
         conflicts.push(`Bentrok dengan seminar ${seminar.studentName} (${seminar.scheduledStartTime || seminar.scheduledTime})`);

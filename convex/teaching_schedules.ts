@@ -90,9 +90,16 @@ export const create = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const toMinutes = (time: string): number => {
+      const normalizedStr = time.replace('.', ':');
+      const [hours, minutes] = normalizedStr.split(':').map(Number);
+      return hours * 60 + (minutes || 0);
+    };
     const now = Date.now();
     return await ctx.db.insert('teaching_schedules', {
       ...args,
+      startMinutes: toMinutes(args.startTime),
+      endMinutes: toMinutes(args.endTime),
       createdAt: now,
     });
   },
@@ -112,8 +119,9 @@ export const createWithValidation = mutation({
   },
   handler: async (ctx, args) => {
     const toMinutes = (time: string): number => {
-      const [hours, minutes] = time.split(':').map(Number);
-      return hours * 60 + minutes;
+      const normalizedStr = time.replace('.', ':');
+      const [hours, minutes] = normalizedStr.split(':').map(Number);
+      return hours * 60 + (minutes || 0);
     };
 
     const lecturerSchedules = await ctx.db
@@ -162,6 +170,8 @@ export const createWithValidation = mutation({
     const now = Date.now();
     return await ctx.db.insert('teaching_schedules', {
       ...args,
+      startMinutes: newStart,
+      endMinutes: newEnd,
       createdAt: now,
     });
   },
@@ -183,6 +193,12 @@ export const update = mutation({
     isTeamTeaching: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const toMinutes = (time: string): number => {
+      const normalizedStr = time.replace('.', ':');
+      const [hours, minutes] = normalizedStr.split(':').map(Number);
+      return hours * 60 + (minutes || 0);
+    };
+
     const { id, ...updates } = args;
     const existing = await ctx.db.get(id);
     if (!existing) {
@@ -193,6 +209,13 @@ export const update = mutation({
       ...updates,
       updatedAt: Date.now(),
     };
+
+    if (updates.startTime) {
+      updateData.startMinutes = toMinutes(updates.startTime);
+    }
+    if (updates.endTime) {
+      updateData.endMinutes = toMinutes(updates.endTime);
+    }
 
     Object.keys(updateData).forEach(
       (key) => updateData[key] === undefined && delete updateData[key]
@@ -467,6 +490,13 @@ export const importSmartSchedule = mutation({
 
         const isTeamTeaching = matchedLecturerIds.size > 1;
 
+        const toMinutes = (time: string): number => {
+          if (!time) return 0;
+          const normalizedStr = time.replace('.', ':');
+          const [hours, minutes] = normalizedStr.split(':').map(Number);
+          return hours * 60 + (minutes || 0);
+        };
+
         await ctx.db.insert('teaching_schedules', {
           lecturerId: lecturerId,
           groupId: args.groupId,
@@ -474,6 +504,8 @@ export const importSmartSchedule = mutation({
           date: date || undefined,
           startTime,
           endTime,
+          startMinutes: toMinutes(startTime),
+          endMinutes: toMinutes(endTime),
           activity: finalActivity,
           room: room || undefined,
           weekType,

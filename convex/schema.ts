@@ -92,6 +92,8 @@ export default defineSchema({
     shiftId: v.optional(v.string()), // e.g., "2sks-1", "3sks-2"
     startTime: v.string(), // e.g., "07:30"
     endTime: v.string(), // e.g., "09:10"
+    startMinutes: v.optional(v.number()), // Menit dari tengah malam (e.g., 450)
+    endMinutes: v.optional(v.number()), // Menit dari tengah malam (e.g., 550)
     activity: v.string(), // e.g., "Teaching", "Meeting", "Consultation"
     room: v.optional(v.string()),
     notes: v.optional(v.string()),
@@ -143,6 +145,8 @@ export default defineSchema({
     scheduledTime: v.optional(v.string()), // Waktu terjadwal (jika sudah) - deprecated, use startTime/endTime
     scheduledStartTime: v.optional(v.string()), // Waktu mulai (format HH:mm)
     scheduledEndTime: v.optional(v.string()), // Waktu selesai (format HH:mm)
+    scheduledStartMinutes: v.optional(v.number()), // Menit dari tengah malam
+    scheduledEndMinutes: v.optional(v.number()), // Menit dari tengah malam
     scheduledRoom: v.optional(v.string()), // Ruangan (jika sudah)
     revisionCount: v.optional(v.number()), // Jumlah revisi jadwal
     notes: v.optional(v.string()),
