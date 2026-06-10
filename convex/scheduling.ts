@@ -749,6 +749,13 @@ export const checkSlotAvailability = query({
     for (const seminar of scheduledSeminars) {
       if (seminar._id === args.seminarRequestId) continue;
 
+      const sharesLecturer = args.lecturerIds.includes(seminar.supervisor1Id) ||
+           (seminar.supervisor2Id && args.lecturerIds.includes(seminar.supervisor2Id)) ||
+           (seminar.examiner1Id && args.lecturerIds.includes(seminar.examiner1Id)) ||
+           (seminar.examiner2Id && args.lecturerIds.includes(seminar.examiner2Id));
+           
+      if (!sharesLecturer) continue;
+
       const seminarStart = seminar.scheduledStartMinutes !== undefined ? seminar.scheduledStartMinutes : timeToMinutes(seminar.scheduledStartTime || seminar.scheduledTime || '08:00');
       const seminarEnd = seminar.scheduledEndMinutes !== undefined ? seminar.scheduledEndMinutes : timeToMinutes(seminar.scheduledEndTime || '10:00');
 
