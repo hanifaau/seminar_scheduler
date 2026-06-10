@@ -749,10 +749,10 @@ export const checkSlotAvailability = query({
     for (const seminar of scheduledSeminars) {
       if (seminar._id === args.seminarRequestId) continue;
 
-      const sharesLecturer = args.lecturerIds.includes(seminar.supervisor1Id) ||
-           (seminar.supervisor2Id && args.lecturerIds.includes(seminar.supervisor2Id)) ||
-           (seminar.examiner1Id && args.lecturerIds.includes(seminar.examiner1Id)) ||
-           (seminar.examiner2Id && args.lecturerIds.includes(seminar.examiner2Id));
+      const sharesLecturer = lecturerIds.includes(seminar.supervisor1Id) ||
+           (seminar.supervisor2Id && lecturerIds.includes(seminar.supervisor2Id)) ||
+           (seminar.examiner1Id && lecturerIds.includes(seminar.examiner1Id)) ||
+           (seminar.examiner2Id && lecturerIds.includes(seminar.examiner2Id));
            
       if (!sharesLecturer) continue;
 
