@@ -372,7 +372,7 @@ export const importSmartSchedule = mutation({
           const lower = p.toLowerCase().replace(/\./g, '').trim();
           const titles = [
             'prof', 'dr', 'ir', 'st', 'mt', 'msc', 'meng', 'phd', 'eng', 'skom', 'ipu', 'ipm', 'ipp', 'aseaneng', 'msie', 'msi', 'mm', 'dreng', 'mengsc', 'stmt', 'm', 's', 't', 'd',
-            'spd', 'mpd', 'pd', 'ss', 'ma', 'mhum', 'bba', 'mba'
+            'spd', 'mpd', 'pd', 'ss', 'ma', 'mhum', 'bba', 'mba', 'menv', 'mkom', 'mkes', 'mkn', 'mti', 'msn', 'md', 'amd'
           ];
           
           const words = lower.split(' ').filter(Boolean);
@@ -400,7 +400,7 @@ export const importSmartSchedule = mutation({
       for (const keyword of keywords) {
         const matches = allLecturers.filter((lecturer) => {
           const dbName = lecturer.name.toLowerCase();
-          const keywordWords = keyword.toLowerCase().replace(/\./g, '').split(' ').filter(Boolean);
+          const keywordWords = keyword.toLowerCase().replace(/[\.,]/g, '').split(' ').filter(Boolean);
           
           if (keywordWords.length === 0) return false;
           
@@ -433,7 +433,7 @@ export const importSmartSchedule = mutation({
             if (kw.length <= 2) continue; // Ignore initials
             const isMatch = dbWords.some(dw => {
               if (dw === kw) return true;
-              if (Math.abs(dw.length - kw.length) <= 1 && kw.length >= 4) {
+              if (Math.abs(dw.length - kw.length) <= 1 && kw.length >= 5) {
                  return levenshteinDistance(dw, kw) <= 1;
               }
               return false;
@@ -452,6 +452,20 @@ export const importSmartSchedule = mutation({
         if (matches.length === 0) {
           if (!lecturersNotFound.includes(keyword)) {
             lecturersNotFound.push(keyword);
+          }
+          continue;
+        }
+
+        if (matches.length > 1) {
+          // Ambiguous match
+          const exactMatches = matches.filter(m => m.name.toLowerCase() === keyword.toLowerCase());
+          if (exactMatches.length === 1) {
+            matchedLecturerIds.add(exactMatches[0]._id.toString());
+          } else {
+            const ambiguousName = keyword + " (Ambigu)";
+            if (!lecturersNotFound.includes(ambiguousName)) {
+              lecturersNotFound.push(ambiguousName);
+            }
           }
           continue;
         }
