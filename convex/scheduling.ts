@@ -715,7 +715,18 @@ export const checkSlotAvailability = query({
       const lecturer = await ctx.db.get(lecturerId);
 
       for (const schedule of schedules) {
-        if (parseDayName(schedule.day) !== dayName) continue;
+        // 1. Is it a weekly routine schedule for this day? (date is undefined, day matches)
+        const isRoutineMatch = !schedule.date && parseDayName(schedule.day) === dayName;
+        
+        // 2. Is it a specific date schedule? (date matches exactly)
+        // Normalize args.date to YYYY-MM-DD for comparison if needed, or just compare
+        const argsDateObj = new Date(args.date);
+        const argsDateStr = argsDateObj.toISOString().split('T')[0];
+        const isSpecificDateMatch = schedule.date === args.date || schedule.date === argsDateStr;
+        
+        const isDayMatch = isRoutineMatch || isSpecificDateMatch;
+        
+        if (!isDayMatch) continue;
         if (schedule.groupId && !activeGroupIds.has(schedule.groupId.toString())) continue;
         if (!isScheduleActiveOnDate(args.date, schedule, settings)) continue;
 
