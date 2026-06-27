@@ -62,6 +62,11 @@ export default function PermohonanSeminarPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>('semua');
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [editingRequest, setEditingRequest] = React.useState<any>(null);
+  
+  // Download Filter State
+  const [isDownloadDialogOpen, setIsDownloadDialogOpen] = React.useState(false);
+  const [downloadStartDate, setDownloadStartDate] = React.useState('');
+  const [downloadEndDate, setDownloadEndDate] = React.useState('');
 
   // Form state
   const [formData, setFormData] = React.useState({
@@ -328,11 +333,23 @@ export default function PermohonanSeminarPage() {
   const handleDownloadExcel = () => {
     if (!requests) return;
     
-    // Filter scheduled and completed requests
-    const exportableRequests = requests.filter(r => r.status === 'scheduled' || r.status === 'completed');
+    // Filter scheduled and completed requests, and apply date range filters
+    const exportableRequests = requests.filter(r => {
+      if (r.status !== 'scheduled' && r.status !== 'completed') return false;
+      
+      if (r.scheduledDate) {
+        if (downloadStartDate && r.scheduledDate < downloadStartDate) return false;
+        if (downloadEndDate && r.scheduledDate > downloadEndDate) return false;
+      } else if (downloadStartDate || downloadEndDate) {
+        // If there's a date filter but the request doesn't have a scheduled date, exclude it
+        return false; 
+      }
+      
+      return true;
+    });
     
     if (exportableRequests.length === 0) {
-      toast.error('Tidak ada agenda yang dapat diunduh (terjadwal / selesai)');
+      toast.error('Tidak ada agenda pada rentang tanggal tersebut');
       return;
     }
 
@@ -379,7 +396,9 @@ export default function PermohonanSeminarPage() {
     const worksheet = XLSX.utils.json_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Agenda Terjadwal");
-    XLSX.writeFile(workbook, "Agenda_Terjadwal_Seminar.xlsx");
+    XLSX.writeFile(workbook, `Agenda_Terjadwal_Seminar${downloadStartDate ? `_Dari_${downloadStartDate}` : ''}${downloadEndDate ? `_Hingga_${downloadEndDate}` : ''}.xlsx`);
+    
+    setIsDownloadDialogOpen(false);
   };
 
   return (
@@ -393,7 +412,7 @@ export default function PermohonanSeminarPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleDownloadExcel}>
+          <Button variant="outline" onClick={() => setIsDownloadDialogOpen(true)}>
             <Download className="h-4 w-4 mr-2" />
             Unduh Agenda Terjadwal
           </Button>
@@ -575,7 +594,51 @@ export default function PermohonanSeminarPage() {
         </div>
       )}
 
-      {/* Dialog */}
+      {/* Download Filter Dialog */}
+      {isDownloadDialogOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-lg p-6 w-full max-w-sm">
+            <h2 className="text-lg font-semibold mb-2 text-foreground">Unduh Agenda Terjadwal</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Pilih rentang tanggal pelaksanaan seminar/sidang. Kosongkan untuk mengunduh semua data.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="downloadStartDate">Tanggal Awal</Label>
+                <Input
+                  id="downloadStartDate"
+                  type="date"
+                  value={downloadStartDate}
+                  onChange={(e) => setDownloadStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="downloadEndDate">Tanggal Akhir</Label>
+                <Input
+                  id="downloadEndDate"
+                  type="date"
+                  value={downloadEndDate}
+                  onChange={(e) => setDownloadEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setIsDownloadDialogOpen(false)}
+              >
+                Batal
+              </Button>
+              <Button onClick={handleDownloadExcel}>
+                <Download className="h-4 w-4 mr-2" />
+                Unduh
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dialog Form Permohonan */}
       {isDialogOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
