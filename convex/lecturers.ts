@@ -110,7 +110,7 @@ export const update = mutation({
 
     // ---- START AUTO CANCEL SCHEDULING ----
     if (updates.status === 'on leave' || updates.status === 'inactive') {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
       const returnDate = updateData.activeReturnDate as string | undefined;
 
       // Find all relevant seminars
@@ -192,6 +192,19 @@ export const remove = mutation({
     const existing = await ctx.db.get(args.id);
     if (!existing) {
       throw new Error('Lecturer not found');
+    }
+
+    // CHECK FOR GHOST LECTURER: Memastikan dosen tidak sedang terdaftar di permohonan seminar mana pun
+    const seminarRequests = await ctx.db.query('seminar_requests').collect();
+    const isAssigned = seminarRequests.some(req => 
+      req.supervisor1Id === args.id ||
+      req.supervisor2Id === args.id ||
+      req.examiner1Id === args.id ||
+      req.examiner2Id === args.id
+    );
+
+    if (isAssigned) {
+      throw new Error('Tidak dapat menghapus dosen. Dosen ini masih terdaftar pada satu atau lebih permohonan seminar. Harap ganti dosen pada permohonan terkait terlebih dahulu.');
     }
 
     // CASCADING DELETE: Hapus semua jadwal mengajar yang dimiliki dosen ini

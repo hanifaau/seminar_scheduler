@@ -168,6 +168,20 @@ async function getLecturerBusySlotsForDate(
   const lecturer = await ctx.db.get(lecturerId);
   const lecturerName = lecturer?.name || 'Dosen';
 
+  // Check for indefinite leave
+  if (lecturer?.status === 'on leave') {
+    const returnDateStr = (lecturer as any).activeReturnDate;
+    const isIndefiniteOrFuture = !returnDateStr || new Date(returnDateStr) > new Date(date);
+    if (isIndefiniteOrFuture) {
+      return [{
+        startTime: 0,
+        endTime: 24 * 60,
+        lecturerId,
+        lecturerName,
+        activity: 'Cuti (Tidak Tersedia)',
+      }];
+    }
+  }
   const daySchedules = schedules.filter((s: any) => {
     // 1. Is it a weekly routine schedule for this day? (date is undefined, day matches)
     const isRoutineMatch = !s.date && parseDayName(s.day) === parseDayName(day);
@@ -329,7 +343,8 @@ function generateWeekDates(startDate: Date, weekOffset: number = 0): Array<{ dat
     const dayOfWeek = currentDate.getDay();
     // Skip weekends (0 = Sunday, 6 = Saturday)
     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      const dateString = currentDate.toISOString().split('T')[0];
+      // Convert date to string using Asia/Jakarta timezone to prevent UTC shift issues
+      const dateString = currentDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
       dates.push({
         date: dateString,
         day: dayNames[dayOfWeek],
@@ -394,7 +409,9 @@ export const getAvailableSlots = query({
     const alternativeDuration = 40; // Minimum allowed duration for alternative slots
 
     // Seminars cannot be scheduled on the same day (suddenly). Minimum notice is H+1.
-    const startDate = new Date();
+    // Get current WIB time
+    const nowStr = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Jakarta' }); // MM/DD/YYYY
+    const startDate = new Date(nowStr); // This parses as local midnight
     startDate.setDate(startDate.getDate() + 1); // Start from tomorrow
 
     // If there is a return date that is further in the future than tomorrow, jump to it!

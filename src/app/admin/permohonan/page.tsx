@@ -116,7 +116,7 @@ export default function PermohonanSeminarPage() {
   const filteredRequests = React.useMemo(() => {
     if (!requests) return [];
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
 
     return requests.map(request => {
       // Auto-update to 'completed' if scheduledDate is passed
@@ -370,7 +370,7 @@ export default function PermohonanSeminarPage() {
       const waktu = (r.scheduledStartTime || r.scheduledTime) ? `${r.scheduledStartTime || r.scheduledTime} - ${r.scheduledEndTime || 'Selesai'}` : '';
       
       let actualStatus = r.status;
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
       if (r.status === 'scheduled' && r.scheduledDate && r.scheduledDate < todayStr) {
         actualStatus = 'completed';
       }
